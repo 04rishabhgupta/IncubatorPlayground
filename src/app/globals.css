@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Components use these semantic names (bg-surface,
+ * text-muted, fill-office ...) rather than raw palette values, so the theme
+ * can change in one place.
+ */
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Brand: deep teal with a warm amber accent */
+  --color-brand-50: #eefbf9;
+  --color-brand-100: #d5f4ef;
+  --color-brand-200: #aee8df;
+  --color-brand-300: #7cd5ca;
+  --color-brand-400: #48b9ae;
+  --color-brand-500: #2a9d93;
+  --color-brand-600: #1d7e77;
+  --color-brand-700: #1b6560;
+  --color-brand-800: #1a514e;
+  --color-brand-900: #194442;
+  --color-accent-400: #f6b44a;
+  --color-accent-500: #f29d1f;
+  --color-accent-600: #d97f0f;
+
+  /* Neutral surfaces */
+  --color-canvas: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f3f6;
+  --color-border: #e3e7ec;
+  --color-ink: #121826;
+  --color-muted: #5b6576;
+
+  /* Availability (always paired with a text label, never color alone) */
+  --color-status-available: #16a34a;
+  --color-status-busy: #d97706;
+  --color-status-unavailable: #dc2626;
+  --color-status-unknown: #94a3b8;
+
+  /* Floor plan */
+  --color-floor: #fbfbfc;
+  --color-wall: #2b3445;
+  --color-corridor: #eef1f5;
+  --color-office: #ffffff;
+  --color-office-hover: #eefbf9;
+  --color-office-selected: #d5f4ef;
+  --color-common: #f4f1ea;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
