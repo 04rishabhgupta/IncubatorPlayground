@@ -21,7 +21,7 @@ export function homeForRole(role: AppRole): string {
 }
 
 /** Paths that require a signed-in user (checked optimistically in the proxy). */
-export const protectedPrefixes = ["/account", "/company", "/admin", "/settings"] as const;
+export const protectedPrefixes = ["/account", "/company", "/admin", "/settings", "/notifications"] as const;
 
 export function isProtectedPath(pathname: string) {
   return protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

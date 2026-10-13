@@ -7,7 +7,17 @@ test.describe("guest", () => {
   test("sees sign-in and register links @mobile", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Register" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Register", exact: true })).toBeVisible();
+  });
+
+  test("can open the directory from the header @mobile", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Directory" }).click();
+    await expect(page.getByRole("heading", { name: "Company directory" })).toBeVisible();
+    await expect(page.getByRole("searchbox", { name: "Search companies by name" })).toBeVisible();
+    // No horizontal scrolling on small screens.
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 
   for (const path of ["/account", "/company", "/admin", "/settings"]) {

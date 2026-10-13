@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 
 const pillars = [
@@ -24,6 +25,12 @@ export default function HomePage() {
           Meet the companies on your floor.
         </h1>
         <p className="mt-5 text-lg leading-8 text-muted">{siteConfig.description}</p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <ButtonLink href="/directory">Browse the directory</ButtonLink>
+          <ButtonLink href="/register/company" variant="secondary">
+            Register your company
+          </ButtonLink>
+        </div>
       </section>
 
       <section className="mt-14 grid gap-4 sm:grid-cols-3" aria-label="What the platform offers">
@@ -36,7 +43,7 @@ export default function HomePage() {
       </section>
 
       <p className="mt-10 rounded-lg border border-dashed border-border bg-surface-muted px-4 py-3 text-sm text-muted">
-        This is the project foundation. The floor map, directory and accounts are built in the next phases.
+        The interactive floor map is being built next. Until then, use the directory to find companies.
       </p>
     </div>
   );

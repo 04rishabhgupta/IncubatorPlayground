@@ -4,7 +4,7 @@ An interactive 2D virtual startup floor. Visitors explore a top-down map of the 
 discover the companies in each office, and connect with them through live chat, email and
 appointment requests.
 
-> **Status:** Phases 1 (foundation) and 2 (authentication and roles) are complete. See [docs/CHECKLIST.md](docs/CHECKLIST.md) for
+> **Status:** Phases 1–3 (foundation, authentication and roles, company directory and admin approval) are complete. See [docs/CHECKLIST.md](docs/CHECKLIST.md) for
 > progress and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, data model and
 > permission model.
 

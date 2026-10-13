@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { unstable_rethrow } from "next/navigation";
+import { CompanyLogo } from "@/components/company/company-logo";
+import { ResubmitButton } from "@/components/company/resubmit-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { CompanyStatusBadge } from "@/components/ui/status-badge";
 import { requireRole } from "@/lib/auth/session";
-import { createClient } from "@/lib/supabase/server";
+import { getOwnCompany } from "@/lib/companies/queries";
+import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Company dashboard" };
 
@@ -18,34 +21,29 @@ const statusCopy = {
   },
   approved: {
     tone: "success",
-    title: "Your company is approved",
-    body: "Your company is visible to visitors on the platform.",
+    title: "Your company is live",
+    body: "Visitors can find your company in the directory.",
   },
   rejected: {
     tone: "error",
     title: "Your registration was not approved",
-    body: "Contact the platform admin if you have questions about this decision.",
+    body: "Update your profile to address the admin's note, then resubmit it for review.",
   },
   suspended: {
     tone: "error",
     title: "Your company is suspended",
-    body: "Your company is hidden from the public directory. Contact the platform admin to resolve this.",
+    body: "Your company is hidden from the directory. Contact the platform admin to resolve this.",
   },
 } as const;
 
 export default async function CompanyDashboardPage() {
   const { userId } = await requireRole(["company"], "/company");
-  const supabase = await createClient();
 
-  const { data: company, error } = await supabase
-    .from("companies")
-    .select(
-      "id, name, tagline, description, website, business_email, phone, office_details, founded_year, logo_path, status, status_reason, created_at, industry:industries(name), space:floor_spaces(label)",
-    )
-    .eq("owner_id", userId)
-    .maybeSingle();
-
-  if (error) {
+  let company;
+  try {
+    company = await getOwnCompany(userId);
+  } catch (error) {
+    unstable_rethrow(error);
     return (
       <Alert tone="error" title="We couldn't load your company">
         Please refresh the page or try again later.
@@ -65,10 +63,6 @@ export default async function CompanyDashboardPage() {
   }
 
   const copy = statusCopy[company.status];
-  const logoUrl = company.logo_path
-    ? supabase.storage.from("company-logos").getPublicUrl(company.logo_path).data.publicUrl
-    : null;
-
   const details: Array<[string, string | null]> = [
     ["Industry", company.industry?.name ?? null],
     ["Business email", company.business_email],
@@ -79,7 +73,7 @@ export default async function CompanyDashboardPage() {
       "Office",
       company.space?.label ?? (company.office_details ? `Requested: ${company.office_details}` : null),
     ],
-    ["Registered", new Date(company.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })],
+    ["Registered", formatDate(company.created_at)],
   ];
 
   return (
@@ -89,54 +83,57 @@ export default async function CompanyDashboardPage() {
         title={company.name}
         description={company.tagline ?? undefined}
         action={
-          <ButtonLink href="/settings" variant="secondary">
-            Account settings
-          </ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            {company.status === "approved" && (
+              <ButtonLink href={`/companies/${company.slug}`} variant="secondary">
+                View public profile
+              </ButtonLink>
+            )}
+            <ButtonLink href="/company/profile">Edit profile</ButtonLink>
+          </div>
         }
       />
 
       <div className="space-y-6">
         <Alert tone={copy.tone} title={copy.title}>
           {copy.body}
-          {company.status_reason && <p className="mt-2">Note from the admin: {company.status_reason}</p>}
+          {company.status_reason && <p className="mt-2 font-medium">Admin note: {company.status_reason}</p>}
+          {company.status === "rejected" && (
+            <div className="mt-3">
+              <ResubmitButton />
+            </div>
+          )}
         </Alert>
 
         <Card>
           <CardHeader title="Company profile" action={<CompanyStatusBadge status={company.status} />} />
           <CardBody className="grid gap-6 sm:grid-cols-[auto_1fr]">
-            <div className="flex size-24 items-center justify-center overflow-hidden rounded-xl border border-border bg-surface-muted">
-              {logoUrl ? (
-                <Image
-                  src={logoUrl}
-                  alt={`${company.name} logo`}
-                  width={96}
-                  height={96}
-                  className="object-contain"
-                />
-              ) : (
-                <span className="text-2xl font-semibold text-muted" aria-hidden="true">
-                  {company.name.slice(0, 1)}
-                </span>
-              )}
-            </div>
+            <CompanyLogo name={company.name} path={company.logo_path} size="lg" />
             <div className="space-y-4">
               {company.description && (
                 <p className="whitespace-pre-line text-sm text-ink">{company.description}</p>
+              )}
+              {company.services.length > 0 && (
+                <ul className="flex flex-wrap gap-2" aria-label="Services">
+                  {company.services.map((s) => (
+                    <li key={s} className="rounded-lg bg-surface-muted px-2.5 py-1 text-xs text-ink">
+                      {s}
+                    </li>
+                  ))}
+                </ul>
               )}
               <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                 {details.map(([label, value]) => (
                   <div key={label}>
                     <dt className="text-muted">{label}</dt>
-                    <dd className="text-ink">{value ?? "—"}</dd>
+                    <dd className="break-words text-ink">{value ?? "—"}</dd>
                   </div>
                 ))}
               </dl>
             </div>
           </CardBody>
         </Card>
-        <p className="text-sm text-muted">
-          Profile editing, team members and availability are added in the next phases.
-        </p>
+        <p className="text-sm text-muted">Team members and availability are managed in the next phases.</p>
       </div>
     </>
   );

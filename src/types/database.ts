@@ -862,6 +862,10 @@ export type Database = {
         };
         Returns: boolean;
       };
+      resubmit_company_registration: {
+        Args: never;
+        Returns: string;
+      };
       shares_context_with: {
         Args: {
           p_profile_id: string;
@@ -873,6 +877,12 @@ export type Database = {
           p_value: string;
         };
         Returns: string;
+      };
+      valid_services: {
+        Args: {
+          p_services: string[];
+        };
+        Returns: boolean;
       };
     };
     Enums: {

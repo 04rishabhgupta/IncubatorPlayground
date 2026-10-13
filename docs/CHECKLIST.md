@@ -35,11 +35,14 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 
 ## Phase 3 — Company directory
 
-- [ ] Public directory: approved only, search by name, filter by industry
-- [ ] Company public profile page
-- [ ] Company dashboard: edit profile, services, logo
-- [ ] Admin: approve / reject / suspend, with registration review history
-- [ ] Notifications on company status change
+- [x] Public directory (`/directory`): approved companies only, name search (wildcards escaped), industry filter, URL-synced, empty/loading/error states
+- [x] Public company profile (`/companies/[slug]`): about, services, team, availability (Unknown when unset), contact, office; owners/admins can preview non-public profiles
+- [x] Company dashboard: profile editing (`/company/profile`), services, logo upload/replace/remove via RLS-scoped storage
+- [x] Admin: company list with status tabs and search, review page with registration history; approve / reject / suspend / reinstate with required reasons
+- [x] Status changes atomically resolve the registration request and notify the company (DB trigger); rejected companies can resubmit
+- [x] Notifications page and unread badge in the header
+- [x] Tests: review workflow DB tests, E2E lifecycle (pending → rejected → resubmitted → approved → edited → suspended → reinstated)
+- [ ] Admin user management (list/search users, change roles) — planned alongside the Phase 4 admin tools
 
 ## Phase 4 — Interactive floor map
 

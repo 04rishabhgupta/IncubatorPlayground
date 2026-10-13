@@ -151,6 +151,21 @@ Appointment status workflow (trigger-enforced):
     └──────────────────────► cancelled
 ```
 
+## Company review workflow
+
+```
+ sign-up ──► pending ──approve──► approved ──suspend (reason)──► suspended
+               │                     ▲                              │
+               └─reject (reason)─► rejected ─approve─┘   reinstate ─┘
+                                     │
+                     owner edits + resubmits ──► pending (new registration request)
+```
+
+- Admins change `companies.status` from the review page. The update only applies if the company is still in the status the action expects, so two admins reviewing at once can't collide.
+- A database trigger handles the rest in the same transaction: it resolves the pending registration request with the decision and note, and inserts a notification for the company account.
+- A check constraint requires a reason for `rejected` and `suspended`.
+- `resubmit_company_registration()` lets the owner of a rejected company return it to `pending` with a fresh snapshot.
+
 ## Authentication flows
 
 | Flow            | How it works                                                                                                                                                                                                                                                                                                                                                                      |

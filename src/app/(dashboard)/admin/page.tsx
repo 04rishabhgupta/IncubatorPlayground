@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ButtonLink } from "@/components/ui/button";
+import { formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -57,7 +60,11 @@ export default async function AdminPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Super admin" title="Platform overview" />
+      <PageHeader
+        eyebrow="Super admin"
+        title="Platform overview"
+        action={<ButtonLink href="/admin/companies">Manage companies</ButtonLink>}
+      />
       <div className="space-y-6">
         <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {stats.map(([label, value]) => (
@@ -73,7 +80,12 @@ export default async function AdminPage() {
         <Card>
           <CardHeader
             title="Awaiting review"
-            description="Oldest first. Approve, reject and suspend actions arrive with the directory phase."
+            description="Oldest first."
+            action={
+              <ButtonLink href="/admin/companies?status=pending" variant="secondary" size="sm">
+                Review all
+              </ButtonLink>
+            }
           />
           <CardBody>
             {pendingList.error ? (
@@ -83,19 +95,21 @@ export default async function AdminPage() {
             ) : (
               <ul className="divide-y divide-border">
                 {pendingList.data.map((company) => (
-                  <li
-                    key={company.id}
-                    className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium text-ink">{company.name}</p>
-                      <p className="text-muted">
-                        {company.industry?.name ?? "No industry"} · {company.business_email}
-                      </p>
-                    </div>
-                    <time className="text-muted" dateTime={company.created_at}>
-                      {new Date(company.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}
-                    </time>
+                  <li key={company.id}>
+                    <Link
+                      href={`/admin/companies/${company.id}`}
+                      className="-mx-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-3 text-sm hover:bg-surface-muted"
+                    >
+                      <div>
+                        <p className="font-medium text-ink">{company.name}</p>
+                        <p className="text-muted">
+                          {company.industry?.name ?? "No industry"} · {company.business_email}
+                        </p>
+                      </div>
+                      <time className="text-muted" dateTime={company.created_at}>
+                        {formatDate(company.created_at)}
+                      </time>
+                    </Link>
                   </li>
                 ))}
               </ul>
