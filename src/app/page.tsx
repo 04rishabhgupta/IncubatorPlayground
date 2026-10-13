@@ -1,6 +1,7 @@
 import { unstable_rethrow } from "next/navigation";
 import { Suspense } from "react";
 import { FloorExplorer } from "@/components/floor/floor-explorer";
+import { LiveRefresh } from "@/components/realtime/live-refresh";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { getFloorPlan } from "@/lib/floor/queries";
@@ -45,7 +46,12 @@ async function FloorSection({ searchParams }: Pick<PageProps<"/">, "searchParams
       <EmptyFloor message="The floor plan data is incomplete. The platform admin has been asked to fix it." />
     );
   }
-  return <FloorExplorer plan={result.plan} />;
+  return (
+    <>
+      <LiveRefresh channel="floor-availability" tables={["company_availability", "member_availability"]} />
+      <FloorExplorer plan={result.plan} />
+    </>
+  );
 }
 
 function EmptyFloor({ message }: { message: string }) {

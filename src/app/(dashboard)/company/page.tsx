@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
+import { CompanyAvailabilityForm } from "@/components/availability/availability-form";
+import { AvailabilityBadge } from "@/components/company/availability-badge";
 import { CompanyLogo } from "@/components/company/company-logo";
 import { ResubmitButton } from "@/components/company/resubmit-button";
 import { PageHeader } from "@/components/layout/page-header";
@@ -8,6 +10,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { CompanyStatusBadge } from "@/components/ui/status-badge";
 import { requireRole } from "@/lib/auth/session";
+import { getCompanyAvailability, getOwnTeam } from "@/lib/availability/queries";
 import { getOwnCompany } from "@/lib/companies/queries";
 import { formatDate } from "@/lib/format";
 
@@ -39,9 +42,13 @@ const statusCopy = {
 export default async function CompanyDashboardPage() {
   const { userId } = await requireRole(["company"], "/company");
 
-  let company;
+  let company, availability;
+  let team: Awaited<ReturnType<typeof getOwnTeam>> = [];
   try {
     company = await getOwnCompany(userId);
+    if (company) {
+      [availability, team] = await Promise.all([getCompanyAvailability(company.id), getOwnTeam(company.id)]);
+    }
   } catch (error) {
     unstable_rethrow(error);
     return (
@@ -105,6 +112,47 @@ export default async function CompanyDashboardPage() {
           )}
         </Alert>
 
+        <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+          <Card>
+            <CardHeader
+              title="Availability"
+              description={
+                availability
+                  ? `Last updated ${formatDate(availability.updated_at, "datetime")}`
+                  : "Not set — visitors see Unknown."
+              }
+            />
+            <CardBody>
+              <CompanyAvailabilityForm current={availability ?? null} />
+            </CardBody>
+          </Card>
+          <Card className="self-start">
+            <CardHeader
+              title="Team"
+              action={
+                <ButtonLink href="/company/team" variant="secondary" size="sm">
+                  Manage team
+                </ButtonLink>
+              }
+            />
+            <CardBody>
+              {!team?.length ? (
+                <p className="text-sm text-muted">No team members yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {team.slice(0, 6).map((member) => (
+                    <li key={member.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate text-ink">{member.full_name}</span>
+                      <AvailabilityBadge availability={member.availability} />
+                    </li>
+                  ))}
+                  {team.length > 6 && <li className="text-xs text-muted">and {team.length - 6} more</li>}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+
         <Card>
           <CardHeader title="Company profile" action={<CompanyStatusBadge status={company.status} />} />
           <CardBody className="grid gap-6 sm:grid-cols-[auto_1fr]">
@@ -133,7 +181,6 @@ export default async function CompanyDashboardPage() {
             </div>
           </CardBody>
         </Card>
-        <p className="text-sm text-muted">Team members and availability are managed in the next phases.</p>
       </div>
     </>
   );

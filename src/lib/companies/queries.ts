@@ -71,9 +71,11 @@ export async function getCompanyProfile(slug: string) {
         "industry:industries(slug, name), " +
         "floor:floors(name, level), space:floor_spaces(code, label), " +
         "availability:company_availability(status, note, updated_at), " +
-        "team:company_team_members(id, full_name, job_title, sort_order, availability:member_availability(status, updated_at))",
+        "team:company_team_members(id, full_name, job_title, email, sort_order, availability:member_availability(status, updated_at))",
     )
     .eq("slug", slug)
+    // Owners/admins may read hidden members under RLS; the public profile never shows them.
+    .eq("team.is_public", true)
     .order("sort_order", { referencedTable: "team" })
     .maybeSingle()
     .overrideTypes<CompanyProfile, { merge: false }>();
@@ -103,6 +105,7 @@ export type CompanyProfile = {
     id: string;
     full_name: string;
     job_title: string | null;
+    email: string | null;
     sort_order: number;
     availability: { status: AvailabilityStatus; updated_at: string } | null;
   }>;

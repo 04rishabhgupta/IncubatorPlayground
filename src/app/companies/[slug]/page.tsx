@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AvailabilityBadge } from "@/components/company/availability-badge";
 import { CompanyLogo } from "@/components/company/company-logo";
+import { LiveRefresh } from "@/components/realtime/live-refresh";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { CompanyStatusBadge } from "@/components/ui/status-badge";
@@ -34,6 +35,7 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
 
   return (
     <div className="mt-6 space-y-6">
+      <LiveRefresh channel="profile-availability" tables={["company_availability", "member_availability"]} />
       {company.status !== "approved" && (
         <Alert tone="warning" title="This profile is not public">
           Only you and the platform admin can see it until the company is approved.{" "}
@@ -101,6 +103,14 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
                       <div>
                         <p className="font-medium text-ink">{member.full_name}</p>
                         {member.job_title && <p className="text-sm text-muted">{member.job_title}</p>}
+                        {member.email && (
+                          <a
+                            href={`mailto:${member.email}`}
+                            className="break-all text-sm text-brand-700 hover:underline"
+                          >
+                            {member.email}
+                          </a>
+                        )}
                       </div>
                       <AvailabilityBadge availability={member.availability} />
                     </li>

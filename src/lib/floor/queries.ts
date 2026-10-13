@@ -89,6 +89,7 @@ export async function getFloorPlan(floorSlug?: string): Promise<FloorPlanResult>
       .eq("floor_id", floor.id)
       .eq("status", "approved")
       .not("space_id", "is", null)
+      .eq("team.is_public", true) // never show hidden members, even to their own company
       .order("sort_order", { referencedTable: "team" })
       .overrideTypes<MapCompany[], { merge: false }>(),
     supabase.from("industries").select("slug, name").order("name"),

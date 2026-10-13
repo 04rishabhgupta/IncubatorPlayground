@@ -50,15 +50,17 @@ export function Field({ id, label, hint, errors, optional, children }: FieldProp
 
 type InputFieldProps = Omit<ComponentProps<"input">, "id" | "className"> & {
   name: string;
+  /** Defaults to `name`; set it when the same form appears more than once on a page. */
+  id?: string;
   label: string;
   hint?: ReactNode;
   errors?: string[];
   optional?: boolean;
 };
 
-export function InputField({ name, label, hint, errors, optional, ...props }: InputFieldProps) {
+export function InputField({ name, id = name, label, hint, errors, optional, ...props }: InputFieldProps) {
   return (
-    <Field id={name} label={label} hint={hint} errors={errors} optional={optional}>
+    <Field id={id} label={label} hint={hint} errors={errors} optional={optional}>
       {(controlProps) => <input name={name} required={!optional} {...controlProps} {...props} />}
     </Field>
   );
@@ -66,6 +68,7 @@ export function InputField({ name, label, hint, errors, optional, ...props }: In
 
 type TextareaFieldProps = Omit<ComponentProps<"textarea">, "id" | "className"> & {
   name: string;
+  id?: string;
   label: string;
   hint?: ReactNode;
   errors?: string[];
@@ -74,6 +77,7 @@ type TextareaFieldProps = Omit<ComponentProps<"textarea">, "id" | "className"> &
 
 export function TextareaField({
   name,
+  id = name,
   label,
   hint,
   errors,
@@ -82,7 +86,7 @@ export function TextareaField({
   ...props
 }: TextareaFieldProps) {
   return (
-    <Field id={name} label={label} hint={hint} errors={errors} optional={optional}>
+    <Field id={id} label={label} hint={hint} errors={errors} optional={optional}>
       {(controlProps) => (
         <textarea name={name} rows={rows} required={!optional} {...controlProps} {...props} />
       )}
@@ -92,6 +96,7 @@ export function TextareaField({
 
 type SelectFieldProps = Omit<ComponentProps<"select">, "id" | "className"> & {
   name: string;
+  id?: string;
   label: string;
   hint?: ReactNode;
   errors?: string[];
@@ -102,6 +107,7 @@ type SelectFieldProps = Omit<ComponentProps<"select">, "id" | "className"> & {
 
 export function SelectField({
   name,
+  id = name,
   label,
   hint,
   errors,
@@ -111,7 +117,7 @@ export function SelectField({
   ...props
 }: SelectFieldProps) {
   return (
-    <Field id={name} label={label} hint={hint} errors={errors} optional={optional}>
+    <Field id={id} label={label} hint={hint} errors={errors} optional={optional}>
       {(controlProps) => (
         <select name={name} required={!optional} {...controlProps} {...props}>
           {placeholder && <option value="">{placeholder}</option>}

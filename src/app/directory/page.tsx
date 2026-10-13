@@ -3,6 +3,7 @@ import { unstable_rethrow } from "next/navigation";
 import { Suspense } from "react";
 import { CompanyCard } from "@/components/company/company-card";
 import { DirectoryFilters } from "@/components/directory/directory-filters";
+import { LiveRefresh } from "@/components/realtime/live-refresh";
 import { Alert } from "@/components/ui/alert";
 import { listDirectoryCompanies, listIndustries } from "@/lib/companies/queries";
 
@@ -49,6 +50,7 @@ async function DirectoryResults({ searchParams }: Pick<PageProps<"/directory">, 
   const filtered = Boolean(q || industry);
   return (
     <div className="space-y-6">
+      <LiveRefresh channel="directory-availability" tables={["company_availability"]} />
       <DirectoryFilters industries={industries} />
       <p className="text-sm text-muted" aria-live="polite">
         {companies.length === 1 ? "1 company" : `${companies.length} companies`}

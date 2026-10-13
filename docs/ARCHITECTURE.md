@@ -221,6 +221,19 @@ page.tsx (server) ── getFloorPlan(?floor) ──► floors, layout, spaces, 
 error message instead of a broken plan, and the server log names the problem. The floor selector
 appears automatically once there is more than one active floor.
 
+## Availability and live updates
+
+- `company_availability` and `member_availability` each hold one row per company or member. No row
+  means **Unknown**, and choosing Unknown deletes the row. A trigger stamps `updated_at` and
+  `updated_by`, so neither can be forged.
+- Company accounts manage these from `/company` (company status and note) and `/company/team`
+  (team records and per-member status). Every write runs as that user, so RLS confines it to their own company.
+- `<LiveRefresh>` subscribes to Realtime changes on these tables. On the floor map, profiles and the
+  directory, any change triggers a debounced `router.refresh()`. The event is only a signal: data is
+  re-read on the server under RLS, so viewers never receive anything they couldn't already see. Client
+  state (selection, zoom, search) survives the refresh. Every viewer refreshes on every change; that's
+  fine at one-floor scale, and filtered channels can be added later if traffic grows.
+
 ## Company review workflow
 
 ```

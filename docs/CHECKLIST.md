@@ -61,10 +61,13 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 
 ## Phase 5 — Availability
 
-- [ ] Company-level availability with last-updated timestamp
-- [ ] Team member records (CRUD)
-- [ ] Per-member availability; _Unknown_ when never set
-- [ ] Live availability updates on the map (Realtime)
+- [x] Company-level availability (Available / Busy / Unavailable / Unknown) with an optional note and last-updated time
+- [x] "Unknown" clears the stored status; availability is labelled as self-reported (no presence or slot implied)
+- [x] Team member records (non-login): add, edit, hide from public, accepts-appointments flag, reorder, remove
+- [x] Per-member availability with last-updated time
+- [x] Live updates on the floor map, profiles and directory via Supabase Realtime (refresh re-reads data under RLS)
+- [x] Hidden team members never appear on public views, even to their own company
+- [x] Tests: availability/team DB tests (RLS, stamping, Unknown, cascade, realtime publication), E2E incl. a live-update test
 
 ## Phase 6 — Appointments
 
