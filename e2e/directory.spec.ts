@@ -80,7 +80,7 @@ test("admin sees the history and approves", async ({ page }) => {
 });
 
 test("the approved company is searchable, filterable and has a public profile", async ({ page }) => {
-  await searchDirectory(page, accounts.runId);
+  await searchDirectory(page, accounts.company.companyName);
   await expect(page.getByText("1 company match your search")).toBeVisible();
 
   await page.getByLabel("Filter by industry").selectOption("saas");
@@ -117,7 +117,7 @@ test("the company uploads a logo that appears publicly", async ({ page }) => {
   await page.getByRole("button", { name: "Upload logo" }).click();
   await expect(page.getByText("Logo updated.")).toBeVisible();
 
-  await searchDirectory(page, accounts.runId);
+  await searchDirectory(page, accounts.company.companyName);
   await expect(page.getByRole("img", { name: `${accounts.company.companyName} logo` })).toBeVisible();
 });
 
@@ -128,14 +128,14 @@ test("a suspended company disappears and returns when reinstated", async ({ page
   await expect(page.getByText("Company suspended.")).toBeVisible();
 
   const guest = await browser.newPage();
-  await searchDirectory(guest, accounts.runId);
+  await searchDirectory(guest, accounts.company.companyName);
   await expect(guest.getByText("No companies match your search.")).toBeVisible();
 
   await page.reload();
   await page.getByRole("button", { name: "Reinstate" }).click();
   await expect(page.getByText("Company reinstated.")).toBeVisible();
 
-  await searchDirectory(guest, accounts.runId);
+  await searchDirectory(guest, accounts.company.companyName);
   await expect(guest.getByText("1 company match your search")).toBeVisible();
   await guest.close();
 });

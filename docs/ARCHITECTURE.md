@@ -151,6 +151,76 @@ Appointment status workflow (trigger-enforced):
     └──────────────────────► cancelled
 ```
 
+## Floor map
+
+```
+page.tsx (server) ── getFloorPlan(?floor) ──► floors, layout, spaces, approved placed companies, industries
+   └─ FloorExplorer (client)
+        ├─ useMapViewport   zoom/pan state + gestures (pure maths in lib/floor/viewport.ts)
+        ├─ FloorMap         SVG drawing only: areas → spaces → walls → entrances
+        └─ ExplorerPanel    list (search, industry) or details of the selected space
+```
+
+- **Data-driven:** nothing about the floor is hard-coded in components. The drawing comes from
+  `floor_layouts` and `floor_spaces`, and the occupants come from `companies.space_id`.
+- **Zoom and pan:** these change the SVG `viewBox` (the visible rectangle of floor coordinates), so text
+  stays sharp. The viewBox keeps the container's aspect ratio. Zoom is limited to 1–4×, and panning
+  stops at the edges of the floor.
+- **Selection lives in the URL:** `?company=<slug>` or `?space=<code>`, updated with
+  `history.pushState`. Deep links and the back button work, and the floor data isn't reloaded.
+- **Admin placement:** `/admin/floor` reuses the same map. A company can only move into a vacant
+  office, because `companies.space_id` is unique (no swaps). A trigger notifies the company whenever
+  its office changes.
+
+### Adding or editing a floor
+
+1. Insert a `floors` row (building, name, slug, level).
+2. Insert its `floor_layouts` row. `width` and `height` define the coordinate space, and `geometry` is:
+
+   ```json
+   {
+     "walls": [
+       {
+         "points": [
+           [20, 20],
+           [1180, 20],
+           [1180, 780],
+           [20, 780]
+         ],
+         "closed": true
+       }
+     ],
+     "areas": [
+       {
+         "key": "corridor",
+         "kind": "corridor",
+         "label": "Corridor",
+         "shape": { "type": "rect", "x": 40, "y": 340, "width": 1120, "height": 120 }
+       }
+     ],
+     "entrances": [
+       {
+         "key": "main",
+         "label": "Main Entrance",
+         "x": 1010,
+         "y": 780,
+         "width": 80,
+         "orientation": "horizontal"
+       }
+     ]
+   }
+   ```
+
+   Area kinds: `corridor`, `lounge`, `pantry`, `restroom`, `stairs`, `lift`, `other`.
+
+3. Insert one `floor_spaces` row per clickable space: `code`, `kind` (`office`, `meeting_room`,
+   `common_area`, `reception`), `label`, optional `capacity`, and `shape`. A shape is
+   `{ "type": "rect", x, y, width, height, rx? }` or `{ "type": "polygon", "points": [[x, y], …] }`.
+
+`src/lib/floor/geometry.ts` validates this format. If a floor's data is invalid, the map shows an
+error message instead of a broken plan, and the server log names the problem. The floor selector
+appears automatically once there is more than one active floor.
+
 ## Company review workflow
 
 ```

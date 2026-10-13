@@ -77,3 +77,27 @@ export function shapeCenter(shape: Shape) {
   const b = shapeBounds(shape);
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
+
+export type Bounds = { x: number; y: number; width: number; height: number };
+
+/** Value for an SVG <polygon points="…"> attribute. */
+export function polygonPoints(points: Array<[number, number]>) {
+  return points.map(([x, y]) => `${x},${y}`).join(" ");
+}
+
+/**
+ * Shortens a label so it fits a given width at a given font size. SVG text
+ * does not wrap or ellipsize, so this uses an average glyph width estimate.
+ */
+export function fitLabel(text: string, maxWidth: number, fontSize: number) {
+  const maxChars = Math.max(1, Math.floor(maxWidth / (fontSize * 0.56)));
+  const clean = text.trim().replace(/\s+/g, " ");
+  if (clean.length <= maxChars) return clean;
+  if (maxChars <= 1) return "…";
+  return `${clean.slice(0, maxChars - 1).trimEnd()}…`;
+}
+
+/** Font size for labels inside a space, scaled to its size within sensible limits. */
+export function labelFontSize(bounds: Bounds, { min = 12, max = 26, ratio = 0.11 } = {}) {
+  return Math.round(Math.min(max, Math.max(min, Math.min(bounds.width, bounds.height) * ratio)));
+}

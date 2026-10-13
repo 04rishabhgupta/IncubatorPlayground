@@ -46,6 +46,8 @@
   --color-office-hover: #eefbf9;
   --color-office-selected: #d5f4ef;
   --color-common: #f4f1ea;
+  --color-meeting: #eef4fb;
+  --color-space-border: #c9d1db;
 }
 
 body {

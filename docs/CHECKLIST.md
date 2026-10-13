@@ -42,16 +42,22 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 - [x] Status changes atomically resolve the registration request and notify the company (DB trigger); rejected companies can resubmit
 - [x] Notifications page and unread badge in the header
 - [x] Tests: review workflow DB tests, E2E lifecycle (pending → rejected → resubmitted → approved → edited → suspended → reinstated)
-- [ ] Admin user management (list/search users, change roles) — planned alongside the Phase 4 admin tools
+- [ ] Admin user management (list/search users, change roles) — moved to Phase 8
 
 ## Phase 4 — Interactive floor map
 
-- [ ] SVG renderer from `floor_layouts` + `floor_spaces`
-- [ ] Hover, selected and availability states; accessible (keyboard, labels)
-- [ ] Zoom and pan; responsive on mobile
-- [ ] Company details panel
-- [ ] Directory ↔ map selection sync
-- [ ] Admin: assign / move companies between offices
+- [x] Floor plan loaded from Supabase (`getFloorPlan`) and validated against the geometry schemas; error/empty states
+- [x] SVG renderer: walls, corridors, common areas, entrance, offices (occupied/vacant), meeting room, reception
+- [x] Hover tooltip, selected and dimmed states, availability dot + text label, legend
+- [x] Custom zoom & pan (no library): wheel at cursor, drag, pinch, double-click, buttons, keyboard (+ − 0, arrows)
+- [x] Selection in the URL (`?company=`, `?space=`) via the History API: deep links and back button
+- [x] Side panel: searchable/filterable company list ↔ map highlight; company details (availability, team, contact)
+- [x] Responsive: side-by-side on desktop, map + panel stacked on mobile; no horizontal scroll
+- [x] Accessibility: offices are focusable buttons with descriptive names, Enter/Space selects, Esc clears, live region
+- [x] Homepage is the floor map; `/directory` stays as the list; profiles link to "View on floor map"
+- [x] Admin placement tool (`/admin/floor`): assign / move (vacant offices only) / remove, rename spaces, capacity
+- [x] Companies notified when their office is assigned, changed or removed (DB trigger)
+- [x] Tests: viewport/label unit tests, placement DB tests, E2E for map, keyboard, zoom/pan, deep links, admin placement
 
 ## Phase 5 — Availability
 
@@ -77,6 +83,7 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 
 ## Phase 8 — Testing and deployment
 
+- [ ] Admin user management: list/search users, change roles
 - [ ] End-to-end tests of the main workflows
 - [ ] RLS tests against a real Supabase instance
 - [ ] Responsive / accessibility pass

@@ -115,7 +115,17 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
           <CardHeader title="Contact & location" />
           <CardBody>
             <dl className="space-y-3 text-sm">
-              <Detail label="Office">{location || "Not assigned yet"}</Detail>
+              <Detail label="Office">
+                {location || "Not assigned yet"}
+                {company.space && company.status === "approved" && (
+                  <Link
+                    href={`/?company=${company.slug}`}
+                    className="mt-1 block font-medium text-brand-700 hover:underline"
+                  >
+                    View on floor map
+                  </Link>
+                )}
+              </Detail>
               <Detail label="Email">
                 <a
                   href={`mailto:${company.business_email}`}

@@ -12,6 +12,16 @@ export type Accounts = {
   visitor: { id: string; email: string; name: string };
   company: { id: string; email: string; name: string; companyName: string };
   admin: { id: string; email: string; name: string };
+  /** Approved companies placed in vacant offices for floor-map tests. */
+  placed: Array<{
+    ownerId: string;
+    email: string;
+    companyId: string;
+    name: string;
+    slug: string;
+    spaceCode: string;
+    spaceLabel: string;
+  }>;
 };
 
 /**

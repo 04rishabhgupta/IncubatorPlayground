@@ -63,7 +63,14 @@ export default async function AdminPage() {
       <PageHeader
         eyebrow="Super admin"
         title="Platform overview"
-        action={<ButtonLink href="/admin/companies">Manage companies</ButtonLink>}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/admin/floor" variant="secondary">
+              Floor layout
+            </ButtonLink>
+            <ButtonLink href="/admin/companies">Manage companies</ButtonLink>
+          </div>
+        }
       />
       <div className="space-y-6">
         <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">

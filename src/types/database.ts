@@ -901,7 +901,8 @@ export type Database = {
         | "company_approved"
         | "company_rejected"
         | "company_suspended"
-        | "system";
+        | "system"
+        | "office_updated";
       registration_status: "pending" | "approved" | "rejected";
       space_kind: "office" | "meeting_room" | "common_area" | "reception";
     };
