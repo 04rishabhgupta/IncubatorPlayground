@@ -8,6 +8,9 @@ appointment requests.
 > progress and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, data model and
 > permission model.
 
+New to the codebase? Start with [docs/LEARNING.md](docs/LEARNING.md): concepts explained with links
+to the files that use them, plus step-by-step walkthroughs of key flows.
+
 ## Tech stack
 
 Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · Supabase (Postgres, Auth, Realtime, Storage) ·
