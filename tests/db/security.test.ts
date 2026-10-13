@@ -514,7 +514,9 @@ describe("notifications", () => {
       [visitorId],
     );
     const id = rows[0].id;
-    const others = await as(db, user(otherVisitorId), `select id from public.notifications`);
+    const others = await as(db, user(otherVisitorId), `select id from public.notifications where id = $1`, [
+      id,
+    ]);
     expect(others.rows).toHaveLength(0);
     await expect(
       as(db, user(visitorId), `update public.notifications set title = 'Edited' where id = $1`, [id]),

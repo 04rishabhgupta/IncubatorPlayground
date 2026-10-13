@@ -6,6 +6,7 @@ import { AvailabilityBadge } from "@/components/company/availability-badge";
 import { CompanyLogo } from "@/components/company/company-logo";
 import { LiveRefresh } from "@/components/realtime/live-refresh";
 import { Alert } from "@/components/ui/alert";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { CompanyStatusBadge } from "@/components/ui/status-badge";
 import { getCompanyProfile } from "@/lib/companies/queries";
@@ -60,6 +61,11 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
             <AvailabilityBadge availability={company.availability} showUpdated />
           </div>
         </div>
+        {company.status === "approved" && (
+          <ButtonLink href={`/companies/${company.slug}/book`} className="shrink-0">
+            Request an appointment
+          </ButtonLink>
+        )}
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
@@ -112,7 +118,18 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
                           </a>
                         )}
                       </div>
-                      <AvailabilityBadge availability={member.availability} />
+                      <div className="flex items-center gap-3">
+                        <AvailabilityBadge availability={member.availability} />
+                        {company.status === "approved" && member.is_bookable && (
+                          <Link
+                            href={`/companies/${company.slug}/book?member=${member.id}`}
+                            className="text-sm font-medium text-brand-700 hover:underline"
+                            aria-label={`Book an appointment with ${member.full_name}`}
+                          >
+                            Book
+                          </Link>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ul>

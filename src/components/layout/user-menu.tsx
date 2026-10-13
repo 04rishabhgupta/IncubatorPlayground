@@ -58,6 +58,12 @@ export async function UserMenu() {
         )}
       </Link>
       <Link
+        href="/account/appointments"
+        className="hidden rounded-lg px-3 py-1.5 text-sm text-muted hover:bg-surface-muted hover:text-ink md:inline"
+      >
+        Appointments
+      </Link>
+      <Link
         href="/settings"
         className="hidden rounded-lg px-3 py-1.5 text-sm text-muted hover:bg-surface-muted hover:text-ink md:inline"
       >

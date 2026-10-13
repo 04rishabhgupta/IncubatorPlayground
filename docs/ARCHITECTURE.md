@@ -234,6 +234,28 @@ appears automatically once there is more than one active floor.
   state (selection, zoom, search) survives the refresh. Every viewer refreshes on every change; that's
   fine at one-floor scale, and filtered channels can be added later if traffic grows.
 
+## Appointments
+
+```
+booking form ──requestAppointment──► appointments (pending) ──trigger──► notification to company
+company inbox ──respondToAppointment──► accepted / rejected ──trigger──► notification to requester
+either side ──cancelAppointment──► cancelled (+ cancellation_reason) ──trigger──► notification to the other side
+```
+
+- **Time:** `starts_at` and `ends_at` are UTC instants. People choose wall-clock times in the building's
+  zone (`buildings.timezone` via `company_timezone()`), and the insert trigger stores that zone in
+  `appointments.timezone`. Conversion lives in `src/lib/appointments/time.ts`.
+- **Rules:** opening hours, 15-minute grid, durations, ≥ 1 hour notice, ≤ 60 days ahead, at most 3 pending
+  requests per company, and no duplicate pending request. They are enforced by `guard_appointment_write`
+  and mirrored in `src/lib/appointments/rules.ts` for instant feedback. Keep the two in sync.
+- **Overlaps:** the `appointments_no_overlap` exclusion constraint rejects two _accepted_ meetings for the same
+  representative whose `[start, end)` ranges overlap (error 23P01). General requests (no representative)
+  and a visitor's own overlaps only produce warnings (`src/lib/appointments/conflicts.ts`).
+- **Privacy:** `get_busy_times()` exposes only start and end times of accepted meetings for public,
+  bookable members. Appointment rows are visible only to the requester, the company owner and admins.
+- **Status workflow:** pending → accepted / rejected / cancelled; accepted → cancelled / completed (after start).
+  The guard trigger enforces it, and details are immutable after submission.
+
 ## Company review workflow
 
 ```

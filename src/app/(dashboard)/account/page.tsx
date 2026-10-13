@@ -23,12 +23,9 @@ export default async function AccountPage() {
         }
       />
       <Card>
-        <CardHeader
-          title="Your activity"
-          description="Conversations and appointment requests with companies will be listed here."
-        />
+        <CardHeader title="Your activity" description="Appointment requests you've sent to companies." />
         <CardBody>
-          <p className="text-sm text-muted">Nothing here yet.</p>
+          <ButtonLink href="/account/appointments">View my appointments</ButtonLink>
         </CardBody>
       </Card>
     </>

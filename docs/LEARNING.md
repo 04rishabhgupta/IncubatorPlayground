@@ -11,10 +11,11 @@ the _why_. It is updated at the end of every phase.
 3. [Supabase and Postgres concepts](#3-supabase-and-postgres-concepts)
 4. [Security patterns](#4-security-patterns)
 5. [The floor map](#5-the-floor-map)
-6. [Testing strategy](#6-testing-strategy)
-7. [Walkthroughs: what happens when…](#7-walkthroughs-what-happens-when)
-8. [What each phase added](#8-what-each-phase-added)
-9. [Glossary](#9-glossary)
+6. [Appointments: time, overlaps and workflow](#6-appointments-time-overlaps-and-workflow)
+7. [Testing strategy](#7-testing-strategy)
+8. [Walkthroughs: what happens when…](#8-walkthroughs-what-happens-when)
+9. [What each phase added](#9-what-each-phase-added)
+10. [Glossary](#10-glossary)
 
 ---
 
@@ -202,7 +203,7 @@ Constraints are rules the data itself must obey; they can never be bypassed:
 
 - `unique (space_id)`: one company per office. That's how "vacant offices only" is guaranteed, even if two admins click at the same moment.
 - `check (status not in ('rejected','suspended') or status_reason is not null)`: rejecting or suspending needs a reason.
-- **Exclusion constraint** (Phase 6): no two accepted appointments for the same person may overlap. See §8.
+- **Exclusion constraint**: no two accepted appointments for the same person may overlap. See §6.
 
 ### Storage
 
@@ -265,7 +266,144 @@ always has a text label, never colour alone.
 
 ---
 
-## 6. Testing strategy
+## 6. Appointments: time, overlaps and workflow
+
+Phase 6 is about _time_: storing it correctly, preventing double bookings, and moving each request
+through a fixed set of statuses.
+
+### Storing time: UTC instants vs wall-clock time
+
+There are two different things people call "a time":
+
+- **An instant:** one exact moment, the same everywhere on Earth. Postgres `timestamptz` stores
+  instants (internally in UTC). `appointments.starts_at` and `ends_at` are instants.
+- **A wall-clock time:** what a clock on the wall shows, e.g. "10:30 on 14 Oct". It only means something
+  together with a **time zone** such as `Asia/Kolkata` (an "IANA zone" name).
+
+People book in _building_ time, because meetings happen at the building. So the form collects wall-clock
+time, and the server converts it to an instant:
+
+```ts
+wallTimeToUtc({ date: "2026-10-14", time: "10:30" }, "Asia/Kolkata"); // → 2026-10-14T05:00:00Z
+```
+
+- [lib/appointments/time.ts](../src/lib/appointments/time.ts) does this with the built-in `Intl.DateTimeFormat`,
+  which knows every zone's rules, including **daylight saving time** (DST). The trick is to guess the UTC
+  offset, then check and correct once. Wall times that don't exist (e.g. 02:30 on a spring-forward night
+  in New York) return `null`.
+- `tests/unit/appointments.test.ts` checks India (+05:30, no DST), New York in summer and winter, the DST gap,
+  and round trips in several zones.
+- The **building's** zone comes from the database (`company_timezone()`), and the insert trigger writes it into
+  `appointments.timezone`, ignoring whatever the client sent. Displays always add the zone label ("IST").
+
+### Half-open ranges and the overlap test
+
+A meeting from 10:00 to 11:00 occupies `[10:00, 11:00)`: it **includes the start and excludes the end**.
+That's why a meeting at 11:00 can follow straight after. Two half-open ranges overlap exactly when:
+
+```ts
+aStart < bEnd && bStart < aEnd; // overlaps() in lib/appointments/rules.ts
+```
+
+Postgres writes the same idea as `tstzrange(starts_at, ends_at, '[)')` and the overlap operator `&&`.
+
+### The exclusion constraint (the double-booking guarantee)
+
+[core_schema migration](../supabase/migrations/20261012100000_core_schema.sql):
+
+```sql
+constraint appointments_no_overlap
+  exclude using gist (member_id with =, tstzrange(starts_at, ends_at, '[)') with &&)
+  where (status = 'accepted' and member_id is not null)
+```
+
+- A `unique` constraint says "no two rows may be **equal**". An **exclusion** constraint generalises that:
+  "no two rows may make all these comparisons true". Here the comparisons are the same `member_id` (`=`)
+  **and** overlapping time ranges (`&&`).
+- `gist` is an index type that can answer "which ranges overlap this one?" quickly. The `btree_gist`
+  extension lets the same index also compare ordinary values like `member_id`.
+- The `where` clause makes it a **partial** constraint: only accepted meetings with a representative count.
+  Pending requests may overlap freely; the slot is only taken when the company accepts.
+- It holds even if two people accept at the same instant, because Postgres checks it inside the
+  transaction. App code that first reads and then writes can't promise that (a "race condition").
+- A violation has error code `23P01`, which `friendlyError()` in
+  [lib/appointments/actions.ts](../src/lib/appointments/actions.ts) turns into a readable message.
+
+### A status workflow as a state machine
+
+A **state machine** is a fixed set of states plus the moves allowed between them:
+
+```
+ pending ──company accepts──► accepted ──company, after start──► completed
+    │ company declines            │ either side cancels (with an optional reason)
+    ├──► rejected                 ▼
+    └──── requester cancels ──► cancelled
+```
+
+`guard_appointment_write` (latest version in
+[cancellation_reason migration](../supabase/migrations/20261016100000_appointment_cancellation_reason.sql))
+enforces this for every update. It also forbids changing the meeting details after submission, and stamps
+`decided_by`/`cancelled_by` itself. A `cancellation_reason` can only be written in the same update that cancels.
+Because the rule lives in the database, a modified client can't "accept" its own request or skip from
+pending to completed.
+
+> **Lesson from this phase:** the first version stored the requester's cancellation reason in
+> `decision_note`, which is the _company's_ field, and the guard trigger correctly refused it. The fix was a
+> data-model change (a separate column), not a weaker rule.
+
+### Defence in depth for one booking
+
+Each layer catches something the previous one can't:
+
+| Layer                | Where                                                                                          | Catches                                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Disabled options     | [booking-form.tsx](../src/components/appointments/booking-form.tsx)                            | Times outside the rules, or already booked, can't be picked       |
+| Pure rules           | `checkSlot()` in [rules.ts](../src/lib/appointments/rules.ts)                                  | A tampered form; same rules, friendly messages                    |
+| Busy-time check      | `requestAppointment` in [actions.ts](../src/lib/appointments/actions.ts)                       | A slot taken since the form loaded                                |
+| Guard trigger        | [appointment_booking migration](../supabase/migrations/20261016090000_appointment_booking.sql) | Anything that skips the app: hours, grid, notice, horizon, limits |
+| Exclusion constraint | core schema                                                                                    | Two accepted overlaps, even at the same instant                   |
+
+The booking rules live in one TypeScript object (`BOOKING_RULES`) **and** in the trigger. If you change one,
+change the other; the database tests will tell you if they disagree.
+
+### Sharing just enough: `get_busy_times`
+
+The booking form needs to know when a representative is busy, but visitors must not see _who_ booked or
+_why_. The `SECURITY DEFINER` function `get_busy_times(member, from, to)` reads the private table and returns
+**only** `starts_at` and `ends_at` for accepted meetings of public, bookable members, for at most 62 days.
+This "narrow window onto private data" is a common pattern; RLS stays strict on the table itself.
+
+### Notifications from the database
+
+`after_appointment_change` inserts the right notification on every request, decision or cancellation.
+Doing it in a trigger means it can't be forgotten in some code path, and it happens in the same
+transaction as the change.
+
+### Two UI patterns worth knowing
+
+- **Redirect after a successful action (Post/Redirect/Get).** Accepting a request moves it out of the
+  "Requests" tab, so a confirmation shown inside its card would vanish. Instead the action redirects to
+  `/company/appointments?done=accepted` and the page shows the notice
+  ([appointment-notice.tsx](../src/components/appointments/appointment-notice.tsx)). Refreshing the page can't
+  resubmit the form either.
+- **Controlled form + manual submit.** In the booking form, date, duration, time and representative depend on
+  each other, so they live in React state. The form submits via `onSubmit` → `startTransition(() => action(formData))`
+  instead of `<form action>`, which would trigger React's automatic reset and clear those fields after a
+  validation error.
+
+### Warnings vs rules
+
+Not every clash is forbidden:
+
+- Two **general** company meetings may overlap, because different people can attend.
+- A visitor may book two companies at once.
+
+[conflicts.ts](../src/lib/appointments/conflicts.ts) is a pure, unit-tested function that sorts clashes into
+**blocked** (the database would refuse it; Accept is hidden) and **warning** (allowed, but shown).
+
+---
+
+## 7. Testing strategy
 
 ```
           ▲ slower, closer to real users
@@ -290,7 +428,7 @@ always has a text label, never colour alone.
 
 ---
 
-## 7. Walkthroughs: what happens when…
+## 8. Walkthroughs: what happens when…
 
 ### …a company registers
 
@@ -331,38 +469,64 @@ always has a text label, never colour alone.
 
 ---
 
-## 8. What each phase added
+### …someone books an appointment and the company accepts
 
-| Phase          | Concepts introduced                                                                       | Key files                                                                                             |
-| -------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 1 Foundation   | Migrations, RLS, grants, guard triggers, PGlite tests, validated env                      | `supabase/migrations/2026101210*`, `tests/db/harness.ts`, `src/lib/env*.ts`                           |
-| 2 Auth         | Supabase Auth with cookies, Data Access Layer, Server Actions, signup trigger, Playwright | `src/lib/auth/*`, `src/proxy.ts`, `src/app/(auth)/*`                                                  |
-| 3 Directory    | Review workflow via triggers, notifications, Storage uploads, URL-synced filters          | `src/lib/companies/*`, `src/lib/admin/actions.ts`, `20261014090000_company_review.sql`                |
-| 4 Floor map    | SVG `viewBox` zoom/pan, pure viewport maths, History API selection, data-driven geometry  | `src/lib/floor/*`, `src/components/floor/*`, `src/components/admin/floor-placement.tsx`               |
-| 5 Availability | Upserts, "no row = Unknown", Realtime + `router.refresh`, public vs owner views           | `src/lib/availability/*`, `src/components/availability/*`, `src/components/realtime/live-refresh.tsx` |
+1. The visitor opens `/companies/<slug>/book`. [book/page.tsx](../src/app/companies/[slug]/book/page.tsx) requires
+   a session, loads the bookable team and the building's time zone (`getBookingContext`), and loads the visitor's
+   own upcoming meetings for the double-booking warning.
+2. Choosing a representative and date calls `fetchBusyTimes` → `get_busy_times()`; taken start times are disabled.
+3. Submitting runs `requestAppointment`: zod → `checkSlot()` → busy-time re-check → `insert` as the visitor.
+4. In Postgres:
+   - RLS checks that the requester is the visitor and the company is approved.
+   - `guard_appointment_write` checks the booking rules, forces `status = 'pending'` and sets the building time zone.
+   - `after_appointment_change` notifies the company.
+   - Realtime tells the company's open inbox to refresh.
+5. The company clicks **Accept** → `respondToAppointment`, which updates the row with `status = 'accepted'` only
+   while it is still `pending`. The guard checks the transition, the exclusion constraint checks overlaps, and
+   the trigger notifies the visitor.
+6. The action redirects to `?done=accepted`; the visitor's "My appointments" refreshes live and shows the meeting link.
 
-**Phase 6 preview:** time zones (storing UTC and showing local time), half-open time ranges, exclusion
-constraints, and a status state machine.
+## 9. What each phase added
+
+| Phase          | Concepts introduced                                                                                                     | Key files                                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1 Foundation   | Migrations, RLS, grants, guard triggers, PGlite tests, validated env                                                    | `supabase/migrations/2026101210*`, `tests/db/harness.ts`, `src/lib/env*.ts`                                 |
+| 2 Auth         | Supabase Auth with cookies, Data Access Layer, Server Actions, signup trigger, Playwright                               | `src/lib/auth/*`, `src/proxy.ts`, `src/app/(auth)/*`                                                        |
+| 3 Directory    | Review workflow via triggers, notifications, Storage uploads, URL-synced filters                                        | `src/lib/companies/*`, `src/lib/admin/actions.ts`, `20261014090000_company_review.sql`                      |
+| 4 Floor map    | SVG `viewBox` zoom/pan, pure viewport maths, History API selection, data-driven geometry                                | `src/lib/floor/*`, `src/components/floor/*`, `src/components/admin/floor-placement.tsx`                     |
+| 5 Availability | Upserts, "no row = Unknown", Realtime + `router.refresh`, public vs owner views                                         | `src/lib/availability/*`, `src/components/availability/*`, `src/components/realtime/live-refresh.tsx`       |
+| 6 Appointments | UTC vs wall time, DST, half-open ranges, exclusion constraint, state machine, privacy-preserving RPC, Post/Redirect/Get | `src/lib/appointments/*`, `src/components/appointments/*`, migrations `20261016090000` and `20261016100000` |
+
+**Phase 7 preview:** sending email from the server (Resend), rate limiting, and real-time chat with read receipts.
 
 ---
 
-## 9. Glossary
+## 10. Glossary
 
-| Term                     | Meaning                                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------------------------- |
-| **Migration**            | A numbered SQL file that changes the database. Applied in order and never edited once applied. |
-| **RLS**                  | Row Level Security: Postgres filters rows per user, using policies.                            |
-| **Policy**               | One RLS rule (`using` for reads, `with check` for writes).                                     |
-| **JWT**                  | Signed token proving who the user is; `auth.uid()` reads the user id from it.                  |
-| **Service role**         | Supabase's all-powerful server key; bypasses RLS. Server-only.                                 |
-| **SECURITY DEFINER**     | A function that runs with its owner's privileges, used for safe permission checks.             |
-| **Trigger**              | A function Postgres runs automatically on insert, update or delete.                            |
-| **Exclusion constraint** | Like `unique`, but for overlaps (e.g. time ranges) instead of equality.                        |
-| **Server Component**     | A React component that runs only on the server.                                                |
-| **Client Component**     | A React component with `"use client"`; runs in the browser for interactivity.                  |
-| **Server Action**        | A server function that forms call directly; always validate and authorize inside.              |
-| **Suspense**             | A React boundary that shows a fallback while the content inside loads.                         |
-| **Prerender**            | Rendering a page ahead of time; request-specific parts are deferred.                           |
-| **Upsert**               | Insert, or update if the row already exists (`on conflict … do update`).                       |
-| **viewBox**              | The visible rectangle of an SVG's coordinate space.                                            |
-| **E2E test**             | End-to-end: a real browser clicking through the real app.                                      |
+| Term                         | Meaning                                                                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Migration**                | A numbered SQL file that changes the database. Applied in order and never edited once applied. |
+| **RLS**                      | Row Level Security: Postgres filters rows per user, using policies.                            |
+| **Policy**                   | One RLS rule (`using` for reads, `with check` for writes).                                     |
+| **JWT**                      | Signed token proving who the user is; `auth.uid()` reads the user id from it.                  |
+| **Service role**             | Supabase's all-powerful server key; bypasses RLS. Server-only.                                 |
+| **SECURITY DEFINER**         | A function that runs with its owner's privileges, used for safe permission checks.             |
+| **Trigger**                  | A function Postgres runs automatically on insert, update or delete.                            |
+| **Exclusion constraint**     | Like `unique`, but for overlaps (e.g. time ranges) instead of equality.                        |
+| **Server Component**         | A React component that runs only on the server.                                                |
+| **Client Component**         | A React component with `"use client"`; runs in the browser for interactivity.                  |
+| **Server Action**            | A server function that forms call directly; always validate and authorize inside.              |
+| **Suspense**                 | A React boundary that shows a fallback while the content inside loads.                         |
+| **Prerender**                | Rendering a page ahead of time; request-specific parts are deferred.                           |
+| **Upsert**                   | Insert, or update if the row already exists (`on conflict … do update`).                       |
+| **viewBox**                  | The visible rectangle of an SVG's coordinate space.                                            |
+| **E2E test**                 | End-to-end: a real browser clicking through the real app.                                      |
+| **Instant / `timestamptz`**  | One exact moment, stored in UTC; looks different on clocks in different zones.                 |
+| **Wall-clock time**          | What a local clock shows ("10:30"); needs a time zone to become an instant.                    |
+| **IANA time zone**           | A named set of offset rules, e.g. `Asia/Kolkata`, `America/New_York`.                          |
+| **DST**                      | Daylight saving time; clocks jump, so some wall times repeat and others don't exist.           |
+| **Half-open range `[a, b)`** | Includes `a`, excludes `b`, so back-to-back ranges don't overlap.                              |
+| **GiST**                     | A Postgres index type for "overlaps / contains" questions on ranges and shapes.                |
+| **State machine**            | A fixed set of states plus the allowed moves between them.                                     |
+| **Race condition**           | A bug where the outcome depends on timing, e.g. two people accepting the same slot at once.    |
+| **Post/Redirect/Get**        | After a form succeeds, redirect to a page that shows the result.                               |

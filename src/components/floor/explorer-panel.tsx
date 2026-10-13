@@ -317,6 +317,12 @@ function Details({
         >
           View full profile
         </Link>
+        <Link
+          href={`/companies/${company.slug}/book`}
+          className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-medium text-ink hover:bg-surface-muted"
+        >
+          Request an appointment
+        </Link>
       </div>
     </div>
   );

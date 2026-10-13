@@ -71,11 +71,20 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 
 ## Phase 6 — Appointments
 
-- [ ] Booking form (company, optional representative, date, time, duration, purpose, type)
-- [ ] Server-side validation and conflict errors mapped to friendly messages
-- [ ] Company request inbox: accept / reject / complete / cancel
-- [ ] Visitor appointment list: cancel
-- [ ] Notifications to both parties
+- [x] Booking form (`/companies/[slug]/book`): optional representative, date, duration, start time, in person / online, purpose
+- [x] Booking rules: 08:00–20:00 building time, ≥ 1 hour notice, ≤ 60 days ahead, 15/30/45/60/90/120 min, 15-minute grid
+- [x] Times stored in UTC, chosen and shown in the building's time zone (DST-safe conversion, unit tested)
+- [x] Representative's booked times disabled in the form (`get_busy_times`, no private details exposed)
+- [x] Double-booking warnings: visitor overlapping their own meetings; overlapping general company meetings
+- [x] Overlapping accepted meetings for the same representative blocked by the exclusion constraint (+ inbox warning)
+- [x] Limits: max 3 pending requests per user per company, no duplicate pending request
+- [x] Company inbox (`/company/appointments`): accept (meeting link / location), decline, cancel, complete; live refresh
+- [x] My appointments (`/account/appointments`) for every signed-in user, with cancellation and reason
+- [x] Company accounts can book other companies; never their own
+- [x] Notifications for request, acceptance, decline and cancellation (DB trigger)
+- [x] Admin monitoring (`/admin/appointments`) with status counts
+- [x] Tests: time-zone/rules/conflict unit tests, booking DB tests (rules, limits, notifications, privacy), E2E for the full loop
+- [ ] Email copies of appointment notifications (Phase 7, Resend)
 
 ## Phase 7 — Communication
 

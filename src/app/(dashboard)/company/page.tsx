@@ -10,6 +10,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { CompanyStatusBadge } from "@/components/ui/status-badge";
 import { requireRole } from "@/lib/auth/session";
+import { countPendingRequests } from "@/lib/appointments/queries";
 import { getCompanyAvailability, getOwnTeam } from "@/lib/availability/queries";
 import { getOwnCompany } from "@/lib/companies/queries";
 import { formatDate } from "@/lib/format";
@@ -43,11 +44,16 @@ export default async function CompanyDashboardPage() {
   const { userId } = await requireRole(["company"], "/company");
 
   let company, availability;
+  let pendingRequests = 0;
   let team: Awaited<ReturnType<typeof getOwnTeam>> = [];
   try {
     company = await getOwnCompany(userId);
     if (company) {
-      [availability, team] = await Promise.all([getCompanyAvailability(company.id), getOwnTeam(company.id)]);
+      [availability, team, pendingRequests] = await Promise.all([
+        getCompanyAvailability(company.id),
+        getOwnTeam(company.id),
+        countPendingRequests(company.id),
+      ]);
     }
   } catch (error) {
     unstable_rethrow(error);
@@ -96,6 +102,9 @@ export default async function CompanyDashboardPage() {
                 View public profile
               </ButtonLink>
             )}
+            <ButtonLink href="/company/appointments" variant="secondary">
+              Appointments{pendingRequests > 0 ? ` (${pendingRequests} new)` : ""}
+            </ButtonLink>
             <ButtonLink href="/company/profile">Edit profile</ButtonLink>
           </div>
         }

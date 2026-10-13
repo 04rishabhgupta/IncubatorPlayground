@@ -33,7 +33,16 @@ type Relationship = {
   is_one_to_one: boolean;
 };
 
-type Fn = { name: string; arg_names: string[] | null; arg_types: string[]; return_type: string };
+type Fn = {
+  name: string;
+  arg_names: string[] | null;
+  arg_types: string[];
+  /** Set for functions with OUT/TABLE columns: all argument types and their modes. */
+  all_arg_types: string[] | null;
+  arg_modes: string[] | null;
+  returns_set: boolean;
+  return_type: string;
+};
 
 const db = await createTestDatabase();
 
@@ -91,6 +100,10 @@ const functions = (
     select p.proname as name,
            p.proargnames as arg_names,
            array(select format_type(t, null) from unnest(p.proargtypes) t) as arg_types,
+           case when p.proallargtypes is null then null
+                else array(select format_type(t, null) from unnest(p.proallargtypes) t) end as all_arg_types,
+           p.proargmodes::text[] as arg_modes,
+           p.proretset as returns_set,
            format_type(p.prorettype, null) as return_type
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
@@ -166,10 +179,20 @@ ${rels.join("\n")}
 }
 
 function functionBlock(fn: Fn) {
-  const args = fn.arg_types.map((t, i) => `          ${fn.arg_names?.[i] ?? `arg${i}`}: ${scalar(t)}`);
+  // "returns table (...)" functions list their columns as mode 't' (or 'o') arguments.
+  const all = fn.all_arg_types ?? fn.arg_types;
+  const modes = fn.arg_modes ?? all.map(() => "i");
+  const inputs: string[] = [];
+  const columns: string[] = [];
+  all.forEach((type, i) => {
+    const line = `          ${fn.arg_names?.[i] ?? `arg${i}`}: ${scalar(type)}`;
+    if (modes[i] === "t" || modes[i] === "o") columns.push(line);
+    else inputs.push(line);
+  });
+  const row = columns.length ? `{\n${columns.join("\n")}\n        }` : scalar(fn.return_type);
   return `      ${fn.name}: {
-        Args: ${args.length ? `{\n${args.join("\n")}\n        }` : "never"}
-        Returns: ${scalar(fn.return_type)}
+        Args: ${inputs.length ? `{\n${inputs.join("\n")}\n        }` : "never"}
+        Returns: ${fn.returns_set ? `${row}[]` : row}
       }`;
 }
 

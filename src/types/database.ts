@@ -31,6 +31,7 @@ export type Database = {
           cancelled_by: string | null;
           created_at: string;
           updated_at: string;
+          cancellation_reason: string | null;
         };
         Insert: {
           id?: string;
@@ -52,6 +53,7 @@ export type Database = {
           cancelled_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          cancellation_reason?: string | null;
         };
         Update: {
           id?: string;
@@ -73,6 +75,7 @@ export type Database = {
           cancelled_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          cancellation_reason?: string | null;
         };
         Relationships: [
           {
@@ -813,9 +816,26 @@ export type Database = {
         };
         Returns: boolean;
       };
+      company_timezone: {
+        Args: {
+          p_company_id: string;
+        };
+        Returns: string;
+      };
       current_app_role: {
         Args: never;
         Returns: Database["public"]["Enums"]["app_role"];
+      };
+      get_busy_times: {
+        Args: {
+          p_member_id: string;
+          p_from: string;
+          p_to: string;
+        };
+        Returns: {
+          starts_at: string;
+          ends_at: string;
+        }[];
       };
       is_company_public: {
         Args: {
