@@ -151,6 +151,24 @@ Appointment status workflow (trigger-enforced):
     └──────────────────────► cancelled
 ```
 
+## Authentication flows
+
+| Flow            | How it works                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Visitor sign-up | `registerVisitor` server action → `supabase.auth.signUp` with `full_name` metadata → signup trigger creates the `visitor` profile → confirmation email → `/auth/confirm` → `/account`                                                                                                                                                                                             |
+| Company sign-up | `registerCompany` validates the form and logo → `signUp` with `account_type: "company"` and company metadata → the trigger creates the profile, the `pending` company and the registration request **in one transaction** (invalid data aborts the sign-up) → logo stored under `company-logos/<company_id>/` with the server-only admin client → confirmation email → `/company` |
+| Sign-in         | `signInWithPassword` → redirect to a validated `?next=` or the role's home                                                                                                                                                                                                                                                                                                        |
+| Password reset  | `resetPasswordForEmail` → email link → `/auth/confirm` (recovery session) → `/settings/password`                                                                                                                                                                                                                                                                                  |
+| Session refresh | `src/proxy.ts` refreshes cookies on every request and redirects guests away from protected paths                                                                                                                                                                                                                                                                                  |
+
+Authorization layers, outermost first:
+
+1. **Proxy:** an optimistic redirect for guests on `/account`, `/company`, `/admin` and `/settings`.
+2. **Data Access Layer** (`src/lib/auth/session.ts`): `getSession`, `requireSession` and `requireRole` verify the JWT (`getClaims`) and load the profile on every protected page and action.
+3. **Postgres RLS and guard triggers:** the final authority. They apply even if a page check is missed.
+
+Login, password reset, resend and duplicate sign-up all return the same response whether or not an account exists, so they don't reveal which emails are registered.
+
 ## Environment variables
 
 | Variable                               | Scope       | Purpose                                           |

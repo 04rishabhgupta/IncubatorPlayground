@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isProtectedPath } from "@/lib/auth/roles";
 import { getPublicEnv } from "@/lib/env";
 import type { Database } from "@/types/database";
 
@@ -48,7 +49,18 @@ export async function updateSession(request: NextRequest) {
 
   // Do not run code between creating the client and getClaims(): it validates
   // the JWT and triggers the refresh that writes new cookies.
-  await supabase.auth.getClaims();
+  const { data } = await supabase.auth.getClaims();
+
+  // Optimistic gate for signed-in areas. Pages still verify the session and
+  // role themselves (src/lib/auth/session.ts); RLS protects the data.
+  const { pathname, search } = request.nextUrl;
+  if (!data?.claims?.sub && isProtectedPath(pathname)) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", `${pathname}${search}`);
+    const redirect = NextResponse.redirect(loginUrl);
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+    return redirect;
+  }
 
   return response;
 }

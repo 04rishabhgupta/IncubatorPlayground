@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { floorGeometrySchema, shapeSchema } from "@/lib/floor/geometry";
-import { anon, as, createAuthUser, createTestDatabase, user, type Db } from "./harness";
+import { anon, as, createAuthUser, createTestDatabase, serviceRole, user, type Db } from "./harness";
 
 const FLOOR_ID = "00000000-0000-4000-8000-000000000101";
 
@@ -43,8 +43,13 @@ beforeAll(async () => {
 
   visitorId = await createAuthUser(db, "visitor@example.com", { full_name: "Vera Visitor" });
   otherVisitorId = await createAuthUser(db, "other@example.com", { full_name: "Otto Other" });
-  companyUserId = await createAuthUser(db, "acme@example.com", { account_type: "company" });
-  otherCompanyUserId = await createAuthUser(db, "globex@example.com", { account_type: "company" });
+  // Company accounts without a company row yet, so these tests can exercise the
+  // direct-insert path (signup with company details is covered in signup.test.ts).
+  companyUserId = await createAuthUser(db, "acme@example.com");
+  otherCompanyUserId = await createAuthUser(db, "globex@example.com");
+  await db.query(`update public.profiles set role = 'company' where id = any($1)`, [
+    [companyUserId, otherCompanyUserId],
+  ]);
 });
 
 describe("seed data", () => {
@@ -64,17 +69,12 @@ describe("seed data", () => {
 });
 
 describe("signup and profiles", () => {
-  it("assigns roles from metadata but never super_admin", async () => {
+  it("never grants super_admin from signup metadata", async () => {
     const sneaky = await createAuthUser(db, "sneaky@example.com", { account_type: "super_admin" });
     const { rows } = await db.query<{ role: string }>(`select role from public.profiles where id = $1`, [
       sneaky,
     ]);
     expect(rows[0].role).toBe("visitor");
-
-    const company = await db.query<{ role: string }>(`select role from public.profiles where id = $1`, [
-      companyUserId,
-    ]);
-    expect(company.rows[0].role).toBe("company");
   });
 
   it("hides profiles from anonymous users", async () => {
@@ -552,5 +552,36 @@ describe("storage", () => {
         `insert into storage.objects (bucket_id, name) values ('company-logos', 'not-a-uuid/logo.png')`,
       ),
     ).rejects.toThrow(/row-level security/);
+  });
+});
+
+describe("schema-wide guarantees", () => {
+  it("enables RLS on every public table", async () => {
+    const { rows } = await db.query<{ tablename: string }>(
+      `select tablename from pg_tables where schemaname = 'public' and not rowsecurity`,
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("gives the service role (server secret key) full access to every public table", async () => {
+    const { rows } = await db.query<{ tablename: string }>(
+      `select tablename from pg_tables where schemaname = 'public' order by tablename`,
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const { tablename } of rows) {
+      const res = await as(db, serviceRole, `select count(*) from public.${tablename}`);
+      expect(res.rows).toHaveLength(1);
+      const privs = await db.query<{ ok: boolean }>(
+        `select bool_and(has_table_privilege('service_role', $1, p)) as ok
+           from unnest(array['SELECT','INSERT','UPDATE','DELETE']) p`,
+        [`public.${tablename}`],
+      );
+      expect(privs.rows[0].ok, tablename).toBe(true);
+    }
+  });
+
+  it("can call the authorization helpers as the service role", async () => {
+    const { rows } = await as<{ is_super_admin: boolean }>(db, serviceRole, `select public.is_super_admin()`);
+    expect(rows[0].is_super_admin).toBe(false);
   });
 });

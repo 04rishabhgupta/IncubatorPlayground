@@ -15,16 +15,23 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 - [x] Database security tests (PGlite) and unit tests
 - [x] Health check route `/api/health`
 - [x] Lint, typecheck, tests and production build pass
-- [ ] Apply migrations to a real Supabase project (requires project credentials or Docker)
+- [x] Apply migrations to the Supabase Cloud project and verify (seed, RLS, keys, `/api/health`)
+- [x] Fix: grant the service role access to public tables (migration `20261013090000`)
 
 ## Phase 2 — Authentication and roles
 
-- [ ] Visitor registration (name, email, password) with email confirmation
-- [ ] Company registration (account and company details; status `pending`), logo upload
-- [ ] Login, logout, password reset
-- [ ] Profile management
-- [ ] Role-aware navigation and route protection (server-side checks)
-- [ ] Super admin bootstrap documented and tested
+- [x] Visitor registration (name, email, password) with email confirmation
+- [x] Company registration: account + company + review request created atomically by the signup trigger; status `pending`
+- [x] Logo upload at registration (PNG/JPEG/WebP ≤ 2 MB, validated by file content)
+- [x] Login, logout, password reset, resend confirmation; `/auth/confirm` handles PKCE and token-hash links
+- [x] Profile management (`/settings`) and password change (`/settings/password`)
+- [x] Role-aware header and dashboards: `/account` (visitor), `/company`, `/admin` (read-only overview)
+- [x] Route protection: optimistic proxy redirect + server-side session/role checks (DAL) + RLS
+- [x] Open-redirect protection for `?next=`; no account enumeration in login/reset/register
+- [x] Super admin bootstrap documented; never grantable via signup metadata (tested)
+- [x] Playwright E2E suite against Supabase Cloud (25 tests, desktop + mobile)
+- [ ] Configure SMTP (e.g. Resend) in Supabase Auth so real users can receive confirmation emails
+- [ ] Manually test a real sign-up and password reset end-to-end once SMTP is configured
 
 ## Phase 3 — Company directory
 

@@ -843,6 +843,13 @@ export type Database = {
         Args: never;
         Returns: boolean;
       };
+      meta_text: {
+        Args: {
+          p_meta: Json;
+          p_key: string;
+        };
+        Returns: string;
+      };
       owns_company: {
         Args: {
           p_company_id: string;
@@ -860,6 +867,12 @@ export type Database = {
           p_profile_id: string;
         };
         Returns: boolean;
+      };
+      slugify: {
+        Args: {
+          p_value: string;
+        };
+        Returns: string;
       };
     };
     Enums: {

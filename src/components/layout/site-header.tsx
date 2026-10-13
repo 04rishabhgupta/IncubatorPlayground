@@ -1,14 +1,18 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { Logo } from "@/components/brand/logo";
+import { UserMenu, UserMenuFallback } from "./user-menu";
 
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="text-ink" aria-label="Startup Floor Connect home">
-          <Logo />
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Link href="/" className="shrink-0 text-ink" aria-label="Startup Floor Connect home">
+          <Logo className="[&>span:last-child]:hidden sm:[&>span:last-child]:inline" />
         </Link>
-        {/* Navigation (directory, sign in, dashboards) arrives with the auth and directory phases. */}
+        <Suspense fallback={<UserMenuFallback />}>
+          <UserMenu />
+        </Suspense>
       </div>
     </header>
   );

@@ -18,7 +18,8 @@
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --linked --schema public > src/types/database.ts",
-    "db:types:offline": "node scripts/generate-db-types.mts && prettier --write src/types/database.ts"
+    "db:types:offline": "node scripts/generate-db-types.mts && prettier --write src/types/database.ts",
+    "test:e2e": "next build && playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.9",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.2",
     "@types/react": "^19",

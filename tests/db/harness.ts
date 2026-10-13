@@ -71,12 +71,13 @@ export async function createTestDatabase() {
 }
 
 export type Db = PGlite;
-export type Actor = { role: "anon" } | { role: "authenticated"; uid: string };
+export type Actor = { role: "anon" } | { role: "service_role" } | { role: "authenticated"; uid: string };
 
 export const anon: Actor = { role: "anon" };
+export const serviceRole: Actor = { role: "service_role" };
 export const user = (uid: string): Actor => ({ role: "authenticated", uid });
 
-/** Run a query as an end-user role with a simulated JWT `sub` claim. */
+/** Run a query as an API role, with a simulated JWT `sub` claim for authenticated users. */
 export async function as<T = Record<string, unknown>>(
   db: Db,
   actor: Actor,
