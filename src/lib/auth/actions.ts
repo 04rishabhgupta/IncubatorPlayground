@@ -3,7 +3,6 @@
 import type { AuthError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getPublicEnv } from "@/lib/env";
 import { checkLogoFile } from "@/lib/files";
 import { fieldErrorsFrom, formValues, type FormState } from "@/lib/forms";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -17,15 +16,10 @@ import {
   visitorRegistrationSchema,
 } from "@/lib/validation/auth";
 import { homeForRole, safeNextPath } from "./roles";
+import { authConfirmUrl } from "./urls";
 import { getSession } from "./session";
 
 const SECRET_FIELDS = ["password", "confirmPassword"];
-
-/** Where Supabase email links land. Without `next`, users go to their role's home. */
-function confirmUrl(next?: string) {
-  const base = `${getPublicEnv().NEXT_PUBLIC_SITE_URL}/auth/confirm`;
-  return next ? `${base}?next=${encodeURIComponent(next)}` : base;
-}
 
 /** Map Supabase Auth errors to user-facing messages without leaking account existence. */
 function authErrorMessage(error: AuthError): string {
@@ -90,7 +84,7 @@ export async function registerVisitor(_prev: FormState, formData: FormData): Pro
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName }, emailRedirectTo: confirmUrl("/account") },
+    options: { data: { full_name: fullName }, emailRedirectTo: authConfirmUrl("/account") },
   });
   if (error) return { status: "error", message: authErrorMessage(error), values };
 
@@ -128,7 +122,7 @@ export async function registerCompany(_prev: FormState, formData: FormData): Pro
     email: input.email,
     password: input.password,
     options: {
-      emailRedirectTo: confirmUrl("/company"),
+      emailRedirectTo: authConfirmUrl("/company"),
       data: {
         account_type: "company",
         full_name: input.fullName,
@@ -208,7 +202,7 @@ export async function resendConfirmation(_prev: FormState, formData: FormData): 
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: parsed.data.email,
-    options: { emailRedirectTo: confirmUrl() },
+    options: { emailRedirectTo: authConfirmUrl() },
   });
   if (error && (error.code === "over_email_send_rate_limit" || error.code === "over_request_rate_limit")) {
     return { status: "error", message: authErrorMessage(error) };
@@ -228,7 +222,7 @@ export async function requestPasswordReset(_prev: FormState, formData: FormData)
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: confirmUrl("/settings/password"),
+    redirectTo: authConfirmUrl("/settings/password"),
   });
   if (error && (error.code === "over_email_send_rate_limit" || error.code === "over_request_rate_limit")) {
     return { status: "error", message: authErrorMessage(error), values };

@@ -22,7 +22,7 @@ describe("getPublicEnv", () => {
     vi.stubEnv("NEXT_PUBLIC_DEFAULT_TIMEZONE", "");
     const { getPublicEnv } = await import("@/lib/env");
     expect(getPublicEnv()).toMatchObject({
-      NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
+      NEXT_PUBLIC_SITE_URL: "http://localhost:3001",
       NEXT_PUBLIC_DEFAULT_TIMEZONE: "Asia/Kolkata",
     });
   });

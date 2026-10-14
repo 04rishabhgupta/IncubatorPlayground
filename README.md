@@ -45,8 +45,9 @@ cp .env.example .env.local      # then fill in the values
 
 4. Load the reference data (floor, offices, industries) by running `supabase/seed.sql` in the
    dashboard's SQL editor.
-5. In Authentication → URL Configuration, set **Site URL** to `http://localhost:3000` and add
-   `http://localhost:3000/**` to the redirect URLs.
+5. In Authentication → URL Configuration, set **Site URL** to `http://localhost:3001` and add
+   `http://localhost:3001/**` to the redirect URLs. These must match `NEXT_PUBLIC_SITE_URL` in
+   `.env.local`; otherwise Supabase sends confirmation and reset links to the Site URL instead.
 
 ### Option B: local Supabase (Docker)
 
@@ -64,8 +65,11 @@ The local Studio runs at <http://127.0.0.1:54323>, and confirmation emails are c
 npm run dev
 ```
 
-Open <http://localhost:3000>. To check the database connection, open <http://localhost:3000/api/health>:
+Open <http://localhost:3001>. To check the database connection, open <http://localhost:3001/api/health>:
 it returns `{"status":"ok","database":"reachable"}` once Supabase is configured.
+
+The dev server is pinned to **port 3001** (`next dev -p 3001`), so it never collides with another app on
+port 3000. If you change the port, update `NEXT_PUBLIC_SITE_URL` and the Supabase URL configuration to match.
 
 ### Configure authentication emails
 
