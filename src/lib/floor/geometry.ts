@@ -26,18 +26,47 @@ export const polygonShapeSchema = z.object({
 
 export const shapeSchema = z.discriminatedUnion("type", [rectShapeSchema, polygonShapeSchema]);
 
+const orientation = z.enum(["horizontal", "vertical"]);
+
+/**
+ * Geometry v2 (Phase 4R) adds wall thickness/kind, doors, windows, furniture
+ * ("fixtures") and area info. Every new field is optional with a default, so
+ * layouts written for v1 still parse unchanged.
+ */
 export const wallSchema = z.object({
   points: z.array(point).min(2).max(500),
   closed: z.boolean().default(false),
+  /** Exterior walls are thick, interior partitions thinner, glass walls translucent. */
+  kind: z.enum(["exterior", "interior", "glass"]).default("exterior"),
+  thickness: z.number().min(1).max(40).optional(),
 });
 
-export const areaKindSchema = z.enum(["corridor", "lounge", "pantry", "restroom", "stairs", "lift", "other"]);
+export const areaKindSchema = z.enum([
+  "corridor",
+  "lounge",
+  "pantry",
+  "restroom",
+  "stairs",
+  "lift",
+  "lift_lobby",
+  "phone_booth",
+  "storage",
+  "event",
+  "terrace",
+  "other",
+]);
+
+export const areaInfoSchema = z.object({
+  description: z.string().max(500).optional(),
+  amenities: z.array(z.string().min(1).max(60)).max(12).default([]),
+});
 
 export const areaSchema = z.object({
   key: z.string().min(1).max(40),
   kind: areaKindSchema,
   label: z.string().max(80).optional(),
   shape: shapeSchema,
+  info: areaInfoSchema.optional(),
 });
 
 export const entranceSchema = z.object({
@@ -46,19 +75,90 @@ export const entranceSchema = z.object({
   x: coordinate,
   y: coordinate,
   width: z.number().positive().max(1_000),
-  orientation: z.enum(["horizontal", "vertical"]),
+  orientation,
+});
+
+/**
+ * A door sits on a wall: (x, y) is where the opening starts, `width` runs
+ * along the wall (right for horizontal walls, down for vertical ones).
+ * `swing` is the side the leaf opens towards (+1 = +y / +x, -1 = -y / -x) and
+ * `hinge` which end of the opening the leaf turns on.
+ */
+export const doorSchema = z.object({
+  x: coordinate,
+  y: coordinate,
+  width: z.number().min(10).max(400),
+  orientation,
+  swing: z.union([z.literal(1), z.literal(-1)]).default(1),
+  hinge: z.enum(["start", "end"]).default("start"),
+  kind: z.enum(["single", "double", "sliding", "opening"]).default("single"),
+});
+
+/** A window along an exterior wall, drawn as glazing in the wall. */
+export const windowSchema = z.object({
+  x: coordinate,
+  y: coordinate,
+  length: z.number().min(10).max(2_000),
+  orientation,
+});
+
+export const fixtureKindSchema = z.enum([
+  "desk",
+  "desk_pair",
+  "chair",
+  "meeting_table",
+  "round_table",
+  "sofa",
+  "armchair",
+  "coffee_table",
+  "plant",
+  "kitchen_counter",
+  "sink",
+  "fridge",
+  "coffee_machine",
+  "reception_desk",
+  "whiteboard",
+  "tv_screen",
+  "printer",
+  "bookshelf",
+  "lockers",
+  "phone_booth",
+  "toilet",
+  "washbasin",
+  "stairs",
+  "lift",
+  "water_cooler",
+  "rug",
+]);
+
+/** Furniture and equipment, drawn from the symbol library. Purely decorative. */
+export const fixtureSchema = z.object({
+  kind: fixtureKindSchema,
+  x: coordinate,
+  y: coordinate,
+  width: z.number().positive().max(2_000),
+  height: z.number().positive().max(2_000),
+  rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0),
 });
 
 export const floorGeometrySchema = z.object({
-  walls: z.array(wallSchema).max(200).default([]),
+  walls: z.array(wallSchema).max(400).default([]),
   areas: z.array(areaSchema).max(200).default([]),
   entrances: z.array(entranceSchema).max(50).default([]),
+  doors: z.array(doorSchema).max(300).default([]),
+  windows: z.array(windowSchema).max(300).default([]),
+  fixtures: z.array(fixtureSchema).max(2_000).default([]),
 });
 
 export type Shape = z.infer<typeof shapeSchema>;
 export type FloorGeometry = z.infer<typeof floorGeometrySchema>;
+export type FloorWall = z.infer<typeof wallSchema>;
 export type FloorArea = z.infer<typeof areaSchema>;
 export type FloorEntrance = z.infer<typeof entranceSchema>;
+export type FloorDoor = z.infer<typeof doorSchema>;
+export type FloorWindow = z.infer<typeof windowSchema>;
+export type FloorFixture = z.infer<typeof fixtureSchema>;
+export type FixtureKind = z.infer<typeof fixtureKindSchema>;
 
 /** Axis-aligned bounding box of a shape (used for label placement and zoom-to-fit). */
 export function shapeBounds(shape: Shape) {

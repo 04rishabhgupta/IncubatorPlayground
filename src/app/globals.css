@@ -48,6 +48,28 @@
   --color-common: #f4f1ea;
   --color-meeting: #eef4fb;
   --color-space-border: #c9d1db;
+  --color-floor-dot: #e4e8ee;
+
+  /* Zones (illustrated plan) */
+  --color-zone-work: #ffffff;
+  --color-zone-meeting: #eef4fb;
+  --color-zone-social: #f6efe3;
+  --color-zone-service: #eef1f5;
+  --color-zone-circulation: #f1f3f6;
+  --color-zone-outdoor: #edf6ec;
+
+  /* Furniture symbols */
+  --color-furniture: #eadfcd;
+  --color-furniture-edge: #9a8a73;
+  --color-upholstery: #c7d4e4;
+  --color-upholstery-edge: #7f93ad;
+  --color-plant: #8cc19a;
+  --color-plant-dark: #4f8a60;
+  --color-ceramic: #ffffff;
+  --color-metal: #c9cfd8;
+  --color-screen: #3b4556;
+  --color-glass: #d9edf7;
+  --color-wall-interior: #6b7586;
 }
 
 body {

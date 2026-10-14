@@ -258,6 +258,84 @@ The floor's walls, corridors and rooms are JSON in the database (`floor_layouts.
 `floor_spaces.shape`). [geometry.ts](../src/lib/floor/geometry.ts) defines the format with zod and checks
 data before it's drawn. Adding a floor is a data task, not a code change (ARCHITECTURE.md → "Adding or editing a floor").
 
+### Phase 4R.1: geometry v2 and the layered renderer
+
+Phase 4R makes the plan look like a real architectural drawing. Step 4R.1 built the _machinery_: a
+richer data format and a renderer that can draw it. No real data changed, so the live floor looks the
+same. The new style can be seen with sample data at **`/admin/floor/preview`** (admins only).
+
+**1. A backward-compatible data format.** [geometry.ts](../src/lib/floor/geometry.ts) gained:
+
+| Field                               | Example                                                                              | Notes                                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `walls[].kind`, `walls[].thickness` | `{"kind": "interior"}`                                                               | `exterior` (8), `interior` (4), `glass` (3) units thick by default                                     |
+| `doors[]`                           | `{"x":180,"y":320,"width":50,"orientation":"horizontal","swing":-1,"kind":"single"}` | `swing` = which side it opens to; `hinge` = which end it turns on; also `double`, `sliding`, `opening` |
+| `windows[]`                         | `{"x":80,"y":20,"length":280,"orientation":"horizontal"}`                            | Drawn as glazing in the wall                                                                           |
+| `fixtures[]`                        | `{"kind":"desk","x":70,"y":90,"width":80,"height":46,"rotation":0}`                  | 26 kinds: desks, chairs, tables, sofas, kitchen, reception, stairs, lift…                              |
+| `areas[].info`                      | `{"description":"…","amenities":["Sofa"]}`                                           | Used for clickable zones in 4R.3                                                                       |
+
+Every new field is **optional with a default** (zod `.default([])`, `.default("exterior")`). That is
+how you change a stored data format without a migration: old data still parses, and the new fields simply
+come back empty. `tests/unit/geometry-v2.test.ts` proves it by reading the real Floor 1 JSON out of
+`seed.sql` and parsing it with the new schema.
+
+**2. Draw once, reuse many times: `<symbol>` and `<use>`.**
+[floor-symbols.tsx](../src/components/floor/floor-symbols.tsx) defines each piece of furniture once inside
+`<defs>` as an SVG `<symbol>`. Every desk on the floor is then just
+`<use href="#…-fx-desk" x y width height>`, a few bytes instead of a copy of the drawing.
+
+- `preserveAspectRatio="none"` lets rectangular pieces (desks, counters) stretch to any size.
+  `"xMidYMid meet"` keeps round ones (plants, chairs) round.
+- Colours are CSS variables from `globals.css` (`--color-furniture`, `--color-upholstery`…), set with inline
+  `style`. Variables _inherit_ into the `<use>` copy, so the whole palette can be retuned in one place.
+- `useId()` gives each map a unique id prefix, so two maps on one page never fight over `#desk`.
+
+**3. Layers (the painter's algorithm).** SVG draws in document order: later elements cover earlier ones.
+[floor-map.tsx](../src/components/floor/floor-map.tsx) therefore paints, bottom to top:
+
+```
+base        floor colour + dot texture + zone fills (corridor, lounge…)
+rooms       each room's floor colour (tinted when hovered/selected)
+details     furniture (with a soft shadow) → walls → windows → doors → entrance
+area-labels zone names, above furniture so a sofa can't hide "LOUNGE"
+spaces      transparent click/focus target + labels + selection ring
+```
+
+The interactive layer is _on top_, so a click anywhere in an office reaches it even over a desk. The
+decorative layers are `aria-hidden` and `pointer-events: none`. Screen readers still meet exactly one
+button per room, as before.
+
+**4. Memoisation keeps zooming smooth.** Every zoom or pan re-renders `FloorMap` with a new `viewBox`. The
+heavy layers (`BaseLayer`, `DetailLayer`, `AreaLabelLayer`) are wrapped in `React.memo` and receive only the
+layout, which doesn't change, so React skips them entirely. Only the ~10 room elements update.
+
+**5. Drawing a door: the SVG arc command.** [drawing.ts](../src/lib/floor/drawing.ts) turns a door into a
+gap in the wall, a leaf (the open door) and its swing path:
+
+```
+M 150 200 A 50 50 0 0 1 100 250   ← move to the closed leaf's tip, then arc (radius 50) to the open tip
+                  │ │ └ sweep-flag: 1 = clockwise on screen (y grows downwards)
+                  │ └── large-arc-flag: 0 = the short (90°) way round
+                  └──── x-axis-rotation: 0
+```
+
+The sweep flag depends on which way the door opens and which end it hinges on. That's easy to get backwards,
+so the unit tests pin exact path strings, and a deliberately flipped flag made them fail (a mutation check).
+
+**6. Readable labels over a busy drawing.** Labels use `paint-order: stroke` with a white stroke (a
+"halo"): the outline is painted _behind_ the letters, so text stays legible on top of furniture.
+
+**7. Testing a component without a browser.** `tests/unit/floor-map-render.test.tsx` renders `FloorMap` to
+an HTML string with `renderToStaticMarkup` and checks:
+
+- the layer order
+- one `<use>` per fixture
+- the counts of doors, windows and wall kinds
+- that every room is still a `role="button"`
+- that ids are unique across two maps
+
+Fast and deterministic. The Playwright suite then confirms nothing changed in the real app.
+
 ### Accessibility
 
 Each office is `role="button"`, focusable with Tab and selectable with Enter or Space. Its label reads like
@@ -488,14 +566,15 @@ Not every clash is forbidden:
 
 ## 9. What each phase added
 
-| Phase          | Concepts introduced                                                                                                     | Key files                                                                                                   |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 1 Foundation   | Migrations, RLS, grants, guard triggers, PGlite tests, validated env                                                    | `supabase/migrations/2026101210*`, `tests/db/harness.ts`, `src/lib/env*.ts`                                 |
-| 2 Auth         | Supabase Auth with cookies, Data Access Layer, Server Actions, signup trigger, Playwright                               | `src/lib/auth/*`, `src/proxy.ts`, `src/app/(auth)/*`                                                        |
-| 3 Directory    | Review workflow via triggers, notifications, Storage uploads, URL-synced filters                                        | `src/lib/companies/*`, `src/lib/admin/actions.ts`, `20261014090000_company_review.sql`                      |
-| 4 Floor map    | SVG `viewBox` zoom/pan, pure viewport maths, History API selection, data-driven geometry                                | `src/lib/floor/*`, `src/components/floor/*`, `src/components/admin/floor-placement.tsx`                     |
-| 5 Availability | Upserts, "no row = Unknown", Realtime + `router.refresh`, public vs owner views                                         | `src/lib/availability/*`, `src/components/availability/*`, `src/components/realtime/live-refresh.tsx`       |
-| 6 Appointments | UTC vs wall time, DST, half-open ranges, exclusion constraint, state machine, privacy-preserving RPC, Post/Redirect/Get | `src/lib/appointments/*`, `src/components/appointments/*`, migrations `20261016090000` and `20261016100000` |
+| Phase               | Concepts introduced                                                                                                              | Key files                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Foundation        | Migrations, RLS, grants, guard triggers, PGlite tests, validated env                                                             | `supabase/migrations/2026101210*`, `tests/db/harness.ts`, `src/lib/env*.ts`                                                                                     |
+| 2 Auth              | Supabase Auth with cookies, Data Access Layer, Server Actions, signup trigger, Playwright                                        | `src/lib/auth/*`, `src/proxy.ts`, `src/app/(auth)/*`                                                                                                            |
+| 3 Directory         | Review workflow via triggers, notifications, Storage uploads, URL-synced filters                                                 | `src/lib/companies/*`, `src/lib/admin/actions.ts`, `20261014090000_company_review.sql`                                                                          |
+| 4 Floor map         | SVG `viewBox` zoom/pan, pure viewport maths, History API selection, data-driven geometry                                         | `src/lib/floor/*`, `src/components/floor/*`, `src/components/admin/floor-placement.tsx`                                                                         |
+| 5 Availability      | Upserts, "no row = Unknown", Realtime + `router.refresh`, public vs owner views                                                  | `src/lib/availability/*`, `src/components/availability/*`, `src/components/realtime/live-refresh.tsx`                                                           |
+| 6 Appointments      | UTC vs wall time, DST, half-open ranges, exclusion constraint, state machine, privacy-preserving RPC, Post/Redirect/Get          | `src/lib/appointments/*`, `src/components/appointments/*`, migrations `20261016090000` and `20261016100000`                                                     |
+| 4R.1 Floor renderer | Backward-compatible schema defaults, SVG `<symbol>`/`<use>`, layering, `React.memo`, SVG arcs, `paint-order` halos, render tests | `src/lib/floor/geometry.ts`, `src/lib/floor/drawing.ts`, `src/components/floor/floor-symbols.tsx`, `src/components/floor/floor-map.tsx`, `/admin/floor/preview` |
 
 **Phase 7 preview:** sending email from the server (Resend), rate limiting, and real-time chat with read receipts.
 
@@ -503,30 +582,35 @@ Not every clash is forbidden:
 
 ## 10. Glossary
 
-| Term                         | Meaning                                                                                        |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Migration**                | A numbered SQL file that changes the database. Applied in order and never edited once applied. |
-| **RLS**                      | Row Level Security: Postgres filters rows per user, using policies.                            |
-| **Policy**                   | One RLS rule (`using` for reads, `with check` for writes).                                     |
-| **JWT**                      | Signed token proving who the user is; `auth.uid()` reads the user id from it.                  |
-| **Service role**             | Supabase's all-powerful server key; bypasses RLS. Server-only.                                 |
-| **SECURITY DEFINER**         | A function that runs with its owner's privileges, used for safe permission checks.             |
-| **Trigger**                  | A function Postgres runs automatically on insert, update or delete.                            |
-| **Exclusion constraint**     | Like `unique`, but for overlaps (e.g. time ranges) instead of equality.                        |
-| **Server Component**         | A React component that runs only on the server.                                                |
-| **Client Component**         | A React component with `"use client"`; runs in the browser for interactivity.                  |
-| **Server Action**            | A server function that forms call directly; always validate and authorize inside.              |
-| **Suspense**                 | A React boundary that shows a fallback while the content inside loads.                         |
-| **Prerender**                | Rendering a page ahead of time; request-specific parts are deferred.                           |
-| **Upsert**                   | Insert, or update if the row already exists (`on conflict … do update`).                       |
-| **viewBox**                  | The visible rectangle of an SVG's coordinate space.                                            |
-| **E2E test**                 | End-to-end: a real browser clicking through the real app.                                      |
-| **Instant / `timestamptz`**  | One exact moment, stored in UTC; looks different on clocks in different zones.                 |
-| **Wall-clock time**          | What a local clock shows ("10:30"); needs a time zone to become an instant.                    |
-| **IANA time zone**           | A named set of offset rules, e.g. `Asia/Kolkata`, `America/New_York`.                          |
-| **DST**                      | Daylight saving time; clocks jump, so some wall times repeat and others don't exist.           |
-| **Half-open range `[a, b)`** | Includes `a`, excludes `b`, so back-to-back ranges don't overlap.                              |
-| **GiST**                     | A Postgres index type for "overlaps / contains" questions on ranges and shapes.                |
-| **State machine**            | A fixed set of states plus the allowed moves between them.                                     |
-| **Race condition**           | A bug where the outcome depends on timing, e.g. two people accepting the same slot at once.    |
-| **Post/Redirect/Get**        | After a form succeeds, redirect to a page that shows the result.                               |
+| Term                           | Meaning                                                                                        |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| **Migration**                  | A numbered SQL file that changes the database. Applied in order and never edited once applied. |
+| **RLS**                        | Row Level Security: Postgres filters rows per user, using policies.                            |
+| **Policy**                     | One RLS rule (`using` for reads, `with check` for writes).                                     |
+| **JWT**                        | Signed token proving who the user is; `auth.uid()` reads the user id from it.                  |
+| **Service role**               | Supabase's all-powerful server key; bypasses RLS. Server-only.                                 |
+| **SECURITY DEFINER**           | A function that runs with its owner's privileges, used for safe permission checks.             |
+| **Trigger**                    | A function Postgres runs automatically on insert, update or delete.                            |
+| **Exclusion constraint**       | Like `unique`, but for overlaps (e.g. time ranges) instead of equality.                        |
+| **Server Component**           | A React component that runs only on the server.                                                |
+| **Client Component**           | A React component with `"use client"`; runs in the browser for interactivity.                  |
+| **Server Action**              | A server function that forms call directly; always validate and authorize inside.              |
+| **Suspense**                   | A React boundary that shows a fallback while the content inside loads.                         |
+| **Prerender**                  | Rendering a page ahead of time; request-specific parts are deferred.                           |
+| **Upsert**                     | Insert, or update if the row already exists (`on conflict … do update`).                       |
+| **viewBox**                    | The visible rectangle of an SVG's coordinate space.                                            |
+| **E2E test**                   | End-to-end: a real browser clicking through the real app.                                      |
+| **Instant / `timestamptz`**    | One exact moment, stored in UTC; looks different on clocks in different zones.                 |
+| **Wall-clock time**            | What a local clock shows ("10:30"); needs a time zone to become an instant.                    |
+| **IANA time zone**             | A named set of offset rules, e.g. `Asia/Kolkata`, `America/New_York`.                          |
+| **DST**                        | Daylight saving time; clocks jump, so some wall times repeat and others don't exist.           |
+| **Half-open range `[a, b)`**   | Includes `a`, excludes `b`, so back-to-back ranges don't overlap.                              |
+| **GiST**                       | A Postgres index type for "overlaps / contains" questions on ranges and shapes.                |
+| **State machine**              | A fixed set of states plus the allowed moves between them.                                     |
+| **Race condition**             | A bug where the outcome depends on timing, e.g. two people accepting the same slot at once.    |
+| **Post/Redirect/Get**          | After a form succeeds, redirect to a page that shows the result.                               |
+| **`<symbol>` / `<use>`**       | Define an SVG drawing once, then stamp copies of it anywhere.                                  |
+| **Painter's algorithm**        | Drawing back-to-front so later layers cover earlier ones; SVG follows document order.          |
+| **Memoisation (`React.memo`)** | Skip re-rendering a component whose props haven't changed.                                     |
+| **Sweep flag**                 | In an SVG arc, which direction (clockwise or not) to go round the circle.                      |
+| **Halo (`paint-order`)**       | A background-coloured outline painted behind text to keep it readable.                         |

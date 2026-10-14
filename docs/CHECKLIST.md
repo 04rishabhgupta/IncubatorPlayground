@@ -59,6 +59,18 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 - [x] Companies notified when their office is assigned, changed or removed (DB trigger)
 - [x] Tests: viewport/label unit tests, placement DB tests, E2E for map, keyboard, zoom/pan, deep links, admin placement
 
+## Phase 4R — Floor explorer revisited (before Phase 7)
+
+- [x] 4R.1 Geometry v2 (walls by kind, doors, windows, fixtures, area info), backward compatible
+- [x] 4R.1 Furniture symbol library (26 symbols) and layered, memoised renderer; labels with halos
+- [x] 4R.1 Admin renderer preview with sample data (`/admin/floor/preview`); render + geometry tests
+- [ ] 4R.2 Floor 1 redesign (data migration, ids 101–104 unchanged), office seats from team order, status chips, zoom-dependent labels
+- [ ] 4R.3 Clickable areas, keyboard room navigation, wider search, richer list cards
+- [ ] 4R.4 Floor tabs + building panel, floor tagline/description, admin floor management
+- [ ] 4R.5 Startup stage / team size / tech stack, FITT Incubation Team, announcements, requested office
+- [ ] 4R.6 Admin layout JSON editor with live preview, validation and history; occupancy overview
+- [ ] 4R.7 Full regression, docs
+
 ## Phase 5 — Availability
 
 - [x] Company-level availability (Available / Busy / Unavailable / Unknown) with an optional note and last-updated time

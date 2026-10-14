@@ -31,7 +31,14 @@ describe("floor geometry", () => {
   });
 
   it("fills defaults for an empty layout", () => {
-    expect(floorGeometrySchema.parse({})).toEqual({ walls: [], areas: [], entrances: [] });
+    expect(floorGeometrySchema.parse({})).toEqual({
+      walls: [],
+      areas: [],
+      entrances: [],
+      doors: [],
+      windows: [],
+      fixtures: [],
+    });
   });
 
   it("computes bounds and centers", () => {

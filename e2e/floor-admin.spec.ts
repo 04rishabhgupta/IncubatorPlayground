@@ -135,3 +135,26 @@ test("admin renames a space and sets its capacity", async ({ page }) => {
   // Restore the seed values.
   await adminClient().from("floor_spaces").update({ label: vacant.label, capacity: 12 }).eq("id", vacant.id);
 });
+
+test("admins can open the renderer preview; visitors cannot", async ({ page }) => {
+  await openTool(page);
+  await page.getByRole("link", { name: "Renderer preview" }).click();
+  await expect(page.getByRole("heading", { name: "Floor renderer preview" })).toBeVisible();
+  await expect(page.getByText("Sample data only")).toBeVisible();
+  const map = page.getByRole("group", { name: "Sample floor floor plan" });
+  await expect(map).toHaveCSS("opacity", "1");
+  expect(await map.locator("use[data-fixture]").count()).toBeGreaterThan(40);
+  expect(await map.locator("[data-door]").count()).toBe(6);
+  expect(await map.locator("[data-window]").count()).toBe(8);
+  // Rooms stay interactive above the furniture.
+  await map.locator('[data-space-code="101"]').click();
+  await expect(map.locator('[data-space-code="101"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("heading", { name: /Furniture symbols \(26\)/ })).toBeVisible();
+
+  const visitor = await page.context().browser()!.newPage();
+  await login(visitor, accounts.visitor.email);
+  await expect(visitor).toHaveURL("/account");
+  await visitor.goto("/admin/floor/preview");
+  await expect(visitor).toHaveURL("/account");
+  await visitor.close();
+});

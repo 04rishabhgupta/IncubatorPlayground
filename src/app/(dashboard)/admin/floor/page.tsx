@@ -30,9 +30,14 @@ export default async function AdminFloorPage({ searchParams }: PageProps<"/admin
         title={result.status === "ok" ? `Floor layout · ${result.data.plan.floor.name}` : "Floor layout"}
         description="Place approved companies in vacant offices. Companies are notified whenever their office changes."
         action={
-          <ButtonLink href="/admin" variant="secondary">
-            Overview
-          </ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/admin/floor/preview" variant="ghost">
+              Renderer preview
+            </ButtonLink>
+            <ButtonLink href="/admin" variant="secondary">
+              Overview
+            </ButtonLink>
+          </div>
         }
       />
       {result.status === "ok" ? (

@@ -163,6 +163,8 @@ page.tsx (server) ── getFloorPlan(?floor) ──► floors, layout, spaces, 
 
 - **Data-driven:** nothing about the floor is hard-coded in components. The drawing comes from
   `floor_layouts` and `floor_spaces`, and the occupants come from `companies.space_id`.
+- **Rendering layers:** base (floor, zones) → room fills → details (furniture, walls, windows, doors) → zone
+  labels → interactive room overlays. The static layers are memoised, so zooming only re-renders the overlays.
 - **Zoom and pan:** these change the SVG `viewBox` (the visible rectangle of floor coordinates), so text
   stays sharp. The viewBox keeps the container's aspect ratio. Zoom is limited to 1–4×, and panning
   stops at the edges of the floor.
@@ -211,7 +213,19 @@ page.tsx (server) ── getFloorPlan(?floor) ──► floors, layout, spaces, 
    }
    ```
 
-   Area kinds: `corridor`, `lounge`, `pantry`, `restroom`, `stairs`, `lift`, `other`.
+   Area kinds: `corridor`, `lounge`, `pantry`, `restroom`, `stairs`, `lift`, `lift_lobby`,
+   `phone_booth`, `storage`, `event`, `terrace`, `other`. Areas may carry
+   `info: { "description": "…", "amenities": ["…"] }`.
+
+   **Geometry v2 (Phase 4R), all optional:**
+   - `walls[].kind`: `exterior` | `interior` | `glass`, with an optional `thickness`.
+   - `doors[]`: `{ x, y, width, orientation, swing: 1 | -1, hinge: "start" | "end", kind: "single" | "double" | "sliding" | "opening" }`.
+     The opening runs from (x, y) along the wall; `swing` is the side the leaf opens towards.
+   - `windows[]`: `{ x, y, length, orientation }`, on exterior walls.
+   - `fixtures[]`: `{ kind, x, y, width, height, rotation: 0 | 90 | 180 | 270 }`. The kinds are listed in
+     `fixtureKindSchema` and drawn from `src/components/floor/floor-symbols.tsx`. Purely decorative.
+
+   Preview any change at `/admin/floor/preview` (sample data) before writing it to the database.
 
 3. Insert one `floor_spaces` row per clickable space: `code`, `kind` (`office`, `meeting_room`,
    `common_area`, `reception`), `label`, optional `capacity`, and `shape`. A shape is
