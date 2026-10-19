@@ -3,17 +3,19 @@
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
-import { shapeBounds } from "@/lib/floor/geometry";
+import { shapeBounds, type Bounds, type FloorArea } from "@/lib/floor/geometry";
+import { arrowDirections, nearestInDirection } from "@/lib/floor/navigation";
 import type { FloorPlan, MapCompany, MapSpace } from "@/lib/floor/queries";
-import { ExplorerPanel, type PanelSelection } from "./explorer-panel";
-import { FloorMap, spaceAccessibleName } from "./floor-map";
+import { matchArea, matchCompany, matchSpace } from "@/lib/floor/search";
+import { ExplorerPanel, type CompanyResult, type PanelSelection, type PlaceResult } from "./explorer-panel";
+import { FloorMap, areaAccessibleName, isSelectableArea, navId, spaceAccessibleName } from "./floor-map";
 import { MapControls, MapLegend } from "./map-controls";
 import { useMapViewport } from "./use-map-viewport";
 
 /**
  * The interactive floor: map + side panel. Selection lives in the URL
- * (?company=<slug> or ?space=<code>) via the History API, so the back button
- * and shared links work without reloading floor data from the server.
+ * (?company=<slug>, ?space=<code> or ?area=<key>) via the History API, so the
+ * back button and shared links work without reloading floor data from the server.
  */
 export function FloorExplorer({ plan }: { plan: FloorPlan }) {
   const pathname = usePathname();
@@ -30,6 +32,7 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
     viewport,
     ready,
     zoom,
+    pixelsPerUnit,
     maxZoom,
     onPointerDown,
     consumeDrag,
@@ -50,11 +53,21 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
     () => [...plan.companies].sort((a, b) => a.name.localeCompare(b.name)),
     [plan.companies],
   );
+  const areas = useMemo(
+    () => plan.layout.geometry.areas.filter(isSelectableArea),
+    [plan.layout.geometry.areas],
+  );
+  const sharedSpaces = useMemo(() => plan.spaces.filter((s) => s.kind !== "office"), [plan.spaces]);
 
   // --- Selection (URL) ---------------------------------------------------------------
   const companySlug = searchParams.get("company");
   const spaceCode = searchParams.get("space");
+  const areaKey = searchParams.get("area");
   const selection = useMemo<PanelSelection>(() => {
+    if (areaKey) {
+      const area = areas.find((a) => a.key === areaKey);
+      if (area) return { type: "area", area };
+    }
     if (companySlug) {
       const company = plan.companies.find((c) => c.slug === companySlug);
       const space = company?.space_id ? spacesById.get(company.space_id) : undefined;
@@ -68,16 +81,20 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
       }
     }
     return null;
-  }, [companySlug, spaceCode, plan.companies, plan.spaces, spacesById, companiesBySpace]);
-  const selectedSpaceId = selection?.space.id ?? null;
+  }, [areaKey, areas, companySlug, spaceCode, plan.companies, plan.spaces, spacesById, companiesBySpace]);
+  const selectedSpaceId = selection && selection.type !== "area" ? selection.space.id : null;
+  const selectedAreaKey = selection?.type === "area" ? selection.area.key : null;
+  const selectedBounds = selection
+    ? shapeBounds(selection.type === "area" ? selection.area.shape : selection.space.shape)
+    : null;
 
   const navigate = useCallback(
-    (params: { company?: string; space?: string } | null) => {
+    (params: { company?: string; space?: string; area?: string } | null) => {
       const next = new URLSearchParams(searchParams.toString());
-      next.delete("company");
-      next.delete("space");
+      for (const key of ["company", "space", "area"]) next.delete(key);
       if (params?.company) next.set("company", params.company);
       if (params?.space) next.set("space", params.space);
+      if (params?.area) next.set("area", params.area);
       const query = next.toString();
       window.history.pushState(null, "", query ? `${pathname}?${query}` : pathname);
     },
@@ -104,37 +121,98 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
     [navigate],
   );
 
+  const selectArea = useCallback(
+    (area: FloorArea) => {
+      if (consumeDrag()) return;
+      navigate({ area: area.key });
+    },
+    [consumeDrag, navigate],
+  );
+
+  const selectPlace = useCallback(
+    (place: PlaceResult) => {
+      navigate(place.type === "area" ? { area: place.area.key } : { space: place.space.code });
+      if (window.matchMedia("(max-width: 1023px)").matches) {
+        rootRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
+    },
+    [navigate],
+  );
+
   const clearSelection = useCallback(() => navigate(null), [navigate]);
 
-  // Fly to the selected space whenever the selection changes (incl. back/forward and deep links).
+  // Fly to the selection whenever it changes (incl. back/forward and deep links).
   useEffect(() => {
-    if (!ready || !selection) return;
-    focus(shapeBounds(selection.space.shape));
-  }, [ready, selectedSpaceId, focus]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!ready || !selectedBounds) return;
+    focus(selectedBounds);
+  }, [ready, selectedSpaceId, selectedAreaKey, focus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Hover and filters ----------------------------------------------------------------
   const [hoveredSpaceId, setHoveredSpaceId] = useState<string | null>(null);
+  const [hoveredAreaKey, setHoveredAreaKey] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [industry, setIndustry] = useState("");
 
-  const visibleCompanies = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase();
-    return sortedCompanies.filter(
-      (c) => (!q || c.name.toLocaleLowerCase().includes(q)) && (!industry || c.industry?.slug === industry),
-    );
-  }, [sortedCompanies, query, industry]);
+  const visibleCompanies = useMemo<CompanyResult[]>(
+    () =>
+      sortedCompanies.flatMap((company) => {
+        if (industry && company.industry?.slug !== industry) return [];
+        const space = company.space_id ? spacesById.get(company.space_id) : undefined;
+        const hit = matchCompany(company, space, query);
+        return hit ? [{ company, reason: hit.reason }] : [];
+      }),
+    [sortedCompanies, spacesById, query, industry],
+  );
+
+  // Shared places are listed (and searchable) unless an industry filter narrows the list to companies.
+  const visiblePlaces = useMemo<PlaceResult[]>(() => {
+    if (industry) return [];
+    const spaces = sharedSpaces.flatMap((space): PlaceResult[] => {
+      const hit = matchSpace(space, query);
+      return hit ? [{ type: "space", space, reason: hit.reason }] : [];
+    });
+    const zones = areas.flatMap((area): PlaceResult[] => {
+      const hit = matchArea(area, query);
+      return hit ? [{ type: "area", area, reason: hit.reason }] : [];
+    });
+    return [...spaces, ...zones];
+  }, [sharedSpaces, areas, query, industry]);
 
   const dimmedSpaceIds = useMemo(() => {
     if (!query.trim() && !industry) return undefined;
-    const visible = new Set(visibleCompanies.map((c) => c.space_id));
+    const visible = new Set(visibleCompanies.map((r) => r.company.space_id));
     return new Set(plan.spaces.filter((s) => s.kind === "office" && !visible.has(s.id)).map((s) => s.id));
   }, [query, industry, visibleCompanies, plan.spaces]);
 
   const hovered = hoveredSpaceId ? spacesById.get(hoveredSpaceId) : undefined;
+  const hoveredArea = hoveredAreaKey ? areas.find((a) => a.key === hoveredAreaKey) : undefined;
+
+  // Everything keyboard navigation can move between: rooms and shared areas.
+  const navTargets = useMemo(
+    () => [
+      ...plan.spaces.map((s) => ({ id: navId.space(s), bounds: shapeBounds(s.shape) })),
+      ...areas.map((a) => ({ id: navId.area(a), bounds: shapeBounds(a.shape) })),
+    ],
+    [plan.spaces, areas],
+  );
 
   // --- Keyboard ----------------------------------------------------------------------------
   function handleMapKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
+    // On a room or area, the arrow keys move to the nearest one in that direction;
+    // elsewhere on the map they pan.
+    const from = (event.target as Element).closest?.("[data-nav-id]")?.getAttribute("data-nav-id");
+    const direction = arrowDirections[event.key];
+    if (from && direction) {
+      event.preventDefault();
+      const next = nearestInDirection(from, navTargets, direction);
+      if (next) {
+        containerRef.current
+          ?.querySelector<SVGGElement>(`[data-nav-id="${CSS.escape(next.id)}"]`)
+          ?.focus({ preventScroll: true });
+      }
+      return;
+    }
     const actions: Record<string, () => void> = {
       "+": zoomIn,
       "=": zoomIn,
@@ -180,18 +258,32 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
             plan={plan}
             companiesBySpace={companiesBySpace}
             viewport={viewport}
+            pixelsPerUnit={pixelsPerUnit}
             selectedSpaceId={selectedSpaceId}
             hoveredSpaceId={hoveredSpaceId}
+            selectedAreaKey={selectedAreaKey}
+            hoveredAreaKey={hoveredAreaKey}
             dimmedSpaceIds={dimmedSpaceIds}
             onSelect={selectSpace}
             onHover={(space) => setHoveredSpaceId(space?.id ?? null)}
             onFocusSpace={(space) => reveal(shapeBounds(space.shape))}
+            onSelectArea={selectArea}
+            onHoverArea={(area) => setHoveredAreaKey(area?.key ?? null)}
+            onFocusArea={(area) => reveal(shapeBounds(area.shape))}
             onPointerDown={onPointerDown}
             className={cn(ready ? "opacity-100" : "opacity-0", "cursor-grab active:cursor-grabbing")}
           />
 
           {hovered && hovered.id !== selectedSpaceId && (
-            <Tooltip space={hovered} company={companiesBySpace.get(hovered.id)} viewport={viewport} />
+            <Tooltip {...spaceTooltip(hovered, companiesBySpace.get(hovered.id))} viewport={viewport} />
+          )}
+          {hoveredArea && hoveredArea.key !== selectedAreaKey && (
+            <Tooltip
+              title={hoveredArea.label ?? ""}
+              detail={hoveredArea.info?.amenities.join(" · ") || "Shared space"}
+              bounds={shapeBounds(hoveredArea.shape)}
+              viewport={viewport}
+            />
           )}
 
           <MapControls
@@ -206,12 +298,15 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
         </div>
         <MapLegend className="sm:hidden" />
         <p className="sr-only" aria-live="polite">
-          {selection
-            ? `Selected ${spaceAccessibleName(selection.space, selection.type === "company" ? selection.company : undefined)}`
-            : ""}
+          {!selection
+            ? ""
+            : selection.type === "area"
+              ? `Selected ${areaAccessibleName(selection.area)}`
+              : `Selected ${spaceAccessibleName(selection.space, selection.type === "company" ? selection.company : undefined)}`}
         </p>
         <p className="hidden text-xs text-muted lg:block">
-          Click an office for details. Scroll to zoom, drag to move, or use + − 0 and the arrow keys.
+          Click an office or shared space for details. Scroll to zoom, drag to move, or use + − 0 and the
+          arrow keys. Tab to a room, then use the arrow keys to move between rooms.
         </p>
       </section>
 
@@ -219,6 +314,7 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
         floorName={plan.floor.name}
         selection={selection}
         companies={visibleCompanies}
+        places={visiblePlaces}
         spacesById={spacesById}
         industries={plan.industries}
         query={query}
@@ -227,23 +323,43 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
         onIndustryChange={setIndustry}
         onSelectCompany={selectCompany}
         onHoverCompany={(company) => setHoveredSpaceId(company?.space_id ?? null)}
+        onSelectPlace={selectPlace}
+        onHoverPlace={(place) => {
+          setHoveredSpaceId(place?.type === "space" ? place.space.id : null);
+          setHoveredAreaKey(place?.type === "area" ? place.area.key : null);
+        }}
         onClose={clearSelection}
       />
     </div>
   );
 }
 
-/** Floating label above the hovered space (pointer devices only). */
+function spaceTooltip(space: MapSpace, company: MapCompany | undefined) {
+  return {
+    title: company ? company.name : space.label,
+    detail: company
+      ? [space.label, company.industry?.name].filter(Boolean).join(" · ")
+      : space.kind === "office"
+        ? "Vacant office"
+        : space.capacity
+          ? `Seats ${space.capacity}`
+          : "Shared space",
+    bounds: shapeBounds(space.shape),
+  };
+}
+
+/** Floating label above the hovered room or area (pointer devices only). */
 function Tooltip({
-  space,
-  company,
+  title,
+  detail,
+  bounds: b,
   viewport,
 }: {
-  space: MapSpace;
-  company: MapCompany | undefined;
+  title: string;
+  detail: string;
+  bounds: Bounds;
   viewport: { x: number; y: number; width: number; height: number };
 }) {
-  const b = shapeBounds(space.shape);
   const left = ((b.x + b.width / 2 - viewport.x) / viewport.width) * 100;
   const top = ((b.y - viewport.y) / viewport.height) * 100;
   if (left < 0 || left > 100 || top < 0 || top > 100) return null;
@@ -253,16 +369,8 @@ function Tooltip({
       className="pointer-events-none absolute z-10 hidden -translate-x-1/2 -translate-y-[calc(100%+8px)] rounded-lg bg-ink px-3 py-2 text-xs text-white shadow-lg [@media(hover:hover)]:block"
       style={{ left: `${left}%`, top: `${top}%` }}
     >
-      <p className="font-semibold">{company ? company.name : space.label}</p>
-      <p className="text-white/75">
-        {company
-          ? [space.label, company.industry?.name].filter(Boolean).join(" · ")
-          : space.kind === "office"
-            ? "Vacant office"
-            : space.capacity
-              ? `Seats ${space.capacity}`
-              : "Shared space"}
-      </p>
+      <p className="font-semibold">{title}</p>
+      <p className="text-white/75">{detail}</p>
     </div>
   );
 }

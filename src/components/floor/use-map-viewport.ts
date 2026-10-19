@@ -39,6 +39,7 @@ export function useMapViewport(content: Bounds, { maxZoom = 4, padding = 40 } = 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [aspect, setAspect] = useState<number | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   const [viewport, setViewport] = useState<Viewport>(() => ({
     x: content.x - padding,
     y: content.y - padding,
@@ -96,7 +97,10 @@ export function useMapViewport(content: Bounds, { maxZoom = 4, padding = 40 } = 
     if (!el) return;
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) setAspect(width / height);
+      if (width > 0 && height > 0) {
+        setAspect(width / height);
+        setContainerWidth(width);
+      }
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -277,6 +281,8 @@ export function useMapViewport(content: Bounds, { maxZoom = 4, padding = 40 } = 
     viewport,
     ready: limits !== null,
     zoom: limits ? zoomLevel(viewport, limits) : 1,
+    /** Screen pixels per floor unit, for sizing text and choosing the detail level. */
+    pixelsPerUnit: containerWidth && viewport.width > 0 ? containerWidth / viewport.width : undefined,
     maxZoom,
     onPointerDown,
     consumeDrag,

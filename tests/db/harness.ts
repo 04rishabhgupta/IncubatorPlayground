@@ -56,17 +56,34 @@ const SUPABASE_SHIM = /* sql */ `
 
 const root = path.resolve(import.meta.dirname, "../..");
 
-export async function createTestDatabase() {
+const migrationsDir = path.join(root, "supabase/migrations");
+const migrationFiles = () =>
+  readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+/** Apply one migration file (by name) to a database. */
+export async function applyMigration(db: Db, file: string) {
+  await db.exec(readFileSync(path.join(migrationsDir, file), "utf8"));
+}
+
+/**
+ * A database with every migration and seed.sql applied. To test a data
+ * migration on an existing database, pass `before` (stop before that
+ * migration file) and `seed` (path of an older seed, relative to the repo).
+ */
+export async function createTestDatabase({
+  before,
+  seed = "supabase/seed.sql",
+}: { before?: string; seed?: string } = {}) {
   const db = await PGlite.create({ extensions: { btree_gist } });
   await db.exec(SUPABASE_SHIM);
 
-  const migrationsDir = path.join(root, "supabase/migrations");
-  for (const file of readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort()) {
-    await db.exec(readFileSync(path.join(migrationsDir, file), "utf8"));
+  for (const file of migrationFiles()) {
+    if (before && file >= before) break;
+    await applyMigration(db, file);
   }
-  await db.exec(readFileSync(path.join(root, "supabase/seed.sql"), "utf8"));
+  await db.exec(readFileSync(path.join(root, seed), "utf8"));
   return db;
 }
 

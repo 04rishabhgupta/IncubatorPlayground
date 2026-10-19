@@ -40,15 +40,15 @@
 
   /* Floor plan */
   --color-floor: #fbfbfc;
-  --color-wall: #2b3445;
+  --color-wall: #262a31;
   --color-corridor: #eef1f5;
   --color-office: #ffffff;
   --color-office-hover: #eefbf9;
   --color-office-selected: #d5f4ef;
   --color-common: #f4f1ea;
   --color-meeting: #eef4fb;
-  --color-space-border: #c9d1db;
-  --color-floor-dot: #e4e8ee;
+  --color-space-border: #d3d8df;
+  --color-plate-border: #d5dae1;
 
   /* Zones (illustrated plan) */
   --color-zone-work: #ffffff;
@@ -58,18 +58,35 @@
   --color-zone-circulation: #f1f3f6;
   --color-zone-outdoor: #edf6ec;
 
-  /* Furniture symbols */
-  --color-furniture: #eadfcd;
-  --color-furniture-edge: #9a8a73;
-  --color-upholstery: #c7d4e4;
-  --color-upholstery-edge: #7f93ad;
-  --color-plant: #8cc19a;
-  --color-plant-dark: #4f8a60;
+  /* Architecture: solid exterior walls, two-tone partitions, glass, door swings */
+  --color-wall-interior: #4b515b;
+  --color-wall-partition: #a9afb8;
+  --color-glass-line: #6f93ad;
+  --color-door-swing: #8a919c;
+
+  /* Furniture: light fills with hairline outlines */
+  --color-furniture: #f3eee6;
+  --color-furniture-edge: #857d70;
+  --color-upholstery: #e4e8ee;
+  --color-upholstery-edge: #8a94a3;
+  --color-plant: #b7d1ba;
+  --color-plant-dark: #6a9472;
   --color-ceramic: #ffffff;
-  --color-metal: #c9cfd8;
-  --color-screen: #3b4556;
-  --color-glass: #d9edf7;
-  --color-wall-interior: #6b7586;
+  --color-metal: #dde1e6;
+  --color-screen: #4a5261;
+  --color-glass: #e4f0f7;
+}
+
+/*
+ * Floor plan detail levels (FloorMap sets data-lod from the zoom). Zoomed
+ * out, furniture recedes so room labels lead; fine detail only appears close up.
+ */
+[data-lod="0"] .fp-fixtures {
+  opacity: 0.55;
+}
+[data-lod="0"] .fp-detail,
+[data-lod="1"] .fp-detail {
+  display: none;
 }
 
 body {

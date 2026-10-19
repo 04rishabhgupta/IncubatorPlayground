@@ -6,17 +6,31 @@ import { AvailabilityBadge } from "@/components/company/availability-badge";
 import { CompanyLogo } from "@/components/company/company-logo";
 import { cn } from "@/lib/cn";
 import { displayUrl } from "@/lib/format";
+import type { FloorArea } from "@/lib/floor/geometry";
 import type { MapCompany, MapSpace } from "@/lib/floor/queries";
+import { areaKindName } from "@/lib/floor/search";
 
 type Industry = { slug: string; name: string };
 
 export type PanelSelection =
-  { type: "company"; company: MapCompany; space: MapSpace } | { type: "space"; space: MapSpace } | null;
+  | { type: "company"; company: MapCompany; space: MapSpace }
+  | { type: "space"; space: MapSpace }
+  | { type: "area"; area: FloorArea }
+  | null;
+
+/** A company in the list, with why it matched the search when that isn't its name. */
+export type CompanyResult = { company: MapCompany; reason: string | null };
+
+/** A shared place in the list: a room such as the boardroom, or an area such as the lounge. */
+export type PlaceResult =
+  | { type: "space"; space: MapSpace; reason: string | null }
+  | { type: "area"; area: FloorArea; reason: string | null };
 
 type PanelProps = {
   floorName: string;
   selection: PanelSelection;
-  companies: MapCompany[];
+  companies: CompanyResult[];
+  places: PlaceResult[];
   spacesById: Map<string, MapSpace>;
   industries: Industry[];
   query: string;
@@ -25,16 +39,20 @@ type PanelProps = {
   onIndustryChange: (value: string) => void;
   onSelectCompany: (company: MapCompany) => void;
   onHoverCompany: (company: MapCompany | null) => void;
+  onSelectPlace: (place: PlaceResult) => void;
+  onHoverPlace: (place: PlaceResult | null) => void;
   onClose: () => void;
 };
 
 export function ExplorerPanel(props: PanelProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const selectionKey = props.selection
-    ? props.selection.type === "company"
+  const selectionKey = !props.selection
+    ? null
+    : props.selection.type === "company"
       ? props.selection.company.id
-      : props.selection.space.id
-    : null;
+      : props.selection.type === "area"
+        ? `area:${props.selection.area.key}`
+        : props.selection.space.id;
 
   // Move focus to the details heading when the selection changes, so screen
   // reader and keyboard users land on the new content.
@@ -67,6 +85,7 @@ export function ExplorerPanel(props: PanelProps) {
 function CompanyList({
   floorName,
   companies,
+  places,
   spacesById,
   industries,
   query,
@@ -75,8 +94,11 @@ function CompanyList({
   onIndustryChange,
   onSelectCompany,
   onHoverCompany,
+  onSelectPlace,
+  onHoverPlace,
 }: PanelProps) {
   const filtering = Boolean(query.trim() || industry);
+  const placeCount = places.length === 1 ? "1 place" : `${places.length} places`;
   return (
     <>
       <div className="space-y-2 border-b border-border p-4">
@@ -89,11 +111,15 @@ function CompanyList({
           type="search"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Search companies"
+          placeholder="Search companies, people, rooms, amenities"
+          aria-describedby="map-search-hint"
           autoComplete="off"
           maxLength={100}
           className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink placeholder:text-muted/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
+        <p id="map-search-hint" className="sr-only">
+          Searches company names, industries, team members, office numbers and shared spaces.
+        </p>
         <label htmlFor="map-industry" className="sr-only">
           Filter by industry
         </label>
@@ -111,58 +137,135 @@ function CompanyList({
           ))}
         </select>
       </div>
-      <p className="px-4 pt-3 text-xs text-muted" aria-live="polite">
-        {companies.length === 1 ? "1 company" : `${companies.length} companies`}
-        {filtering ? " match" : ""}
-      </p>
-      {companies.length === 0 ? (
-        <div className="px-4 py-8 text-center text-sm text-muted">
-          {filtering
-            ? "No companies on this floor match your search."
-            : "No companies have been placed on this floor yet."}
-          {!filtering && (
-            <p className="mt-2">
-              <Link href="/directory" className="text-brand-700 hover:underline">
-                Browse the full directory
-              </Link>
-            </p>
-          )}
-        </div>
-      ) : (
-        <ul
-          data-panel-list
-          className="min-h-0 flex-1 overflow-y-auto p-2"
-          onMouseLeave={() => onHoverCompany(null)}
-        >
-          {companies.map((company) => (
-            <li key={company.id}>
-              <button
-                type="button"
-                onClick={() => onSelectCompany(company)}
-                onMouseEnter={() => onHoverCompany(company)}
-                onFocus={() => onHoverCompany(company)}
-                onBlur={() => onHoverCompany(null)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-surface-muted"
-              >
-                <CompanyLogo name={company.name} path={company.logo_path} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink">{company.name}</span>
-                  <span className="block truncate text-xs text-muted">
-                    {[
-                      company.industry?.name,
-                      company.space_id ? spacesById.get(company.space_id)?.label : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <AvailabilityBadge availability={company.availability} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div data-panel-list className="min-h-0 flex-1 overflow-y-auto">
+        <p className="px-4 pt-3 text-xs text-muted" aria-live="polite">
+          {companies.length === 1 ? "1 company" : `${companies.length} companies`}
+          {filtering ? " match" : ""}
+          {filtering && places.length ? `, ${placeCount}` : ""}
+        </p>
+        {companies.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-muted">
+            {filtering
+              ? "No companies on this floor match your search."
+              : "No companies have been placed on this floor yet."}
+            {!filtering && (
+              <p className="mt-2">
+                <Link href="/directory" className="text-brand-700 hover:underline">
+                  Browse the full directory
+                </Link>
+              </p>
+            )}
+          </div>
+        ) : (
+          <ul aria-label="Companies" className="p-2" onMouseLeave={() => onHoverCompany(null)}>
+            {companies.map(({ company, reason }) => (
+              <li key={company.id}>
+                <CompanyCard
+                  company={company}
+                  space={company.space_id ? spacesById.get(company.space_id) : undefined}
+                  reason={reason}
+                  onSelect={onSelectCompany}
+                  onHover={onHoverCompany}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {places.length > 0 && (
+          <section aria-labelledby="panel-places" className="border-t border-border px-2 pb-2 pt-3">
+            <h3 id="panel-places" className="px-2 text-xs font-semibold uppercase tracking-wide text-muted">
+              Places
+            </h3>
+            <ul className="mt-1" onMouseLeave={() => onHoverPlace(null)}>
+              {places.map((place) => (
+                <li key={place.type === "area" ? `area:${place.area.key}` : place.space.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectPlace(place)}
+                    onMouseEnter={() => onHoverPlace(place)}
+                    onFocus={() => onHoverPlace(place)}
+                    onBlur={() => onHoverPlace(null)}
+                    className="flex w-full flex-col rounded-lg px-2 py-2 text-left hover:bg-surface-muted"
+                  >
+                    <span className="text-sm font-medium text-ink">
+                      {place.type === "area" ? place.area.label : place.space.label}
+                    </span>
+                    <span className="truncate text-xs text-muted">{place.reason ?? placeDetail(place)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
     </>
+  );
+}
+
+/** What kind of place it is and what it offers, without repeating its name ("Pantry · Pantry"). */
+function placeDetail(place: NonNullable<PlaceResult>) {
+  const [name, kind, extras] =
+    place.type === "area"
+      ? [place.area.label, areaKindName(place.area.kind), place.area.info?.amenities ?? []]
+      : [
+          place.space.label,
+          kindLabel[place.space.kind],
+          place.space.capacity ? [`seats ${place.space.capacity}`] : [],
+        ];
+  const parts = [kind === name ? null : kind, ...extras].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "Shared space";
+}
+
+/** One company in the list: who, where, what they do, and who's around. */
+function CompanyCard({
+  company,
+  space,
+  reason,
+  onSelect,
+  onHover,
+}: {
+  company: MapCompany;
+  space: MapSpace | undefined;
+  reason: string | null;
+  onSelect: (company: MapCompany) => void;
+  onHover: (company: MapCompany | null) => void;
+}) {
+  const team = company.team.length;
+  const available = company.team.filter((m) => m.availability?.status === "available").length;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(company)}
+      onMouseEnter={() => onHover(company)}
+      onFocus={() => onHover(company)}
+      onBlur={() => onHover(null)}
+      className="flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-surface-muted"
+    >
+      <CompanyLogo name={company.name} path={company.logo_path} size="sm" />
+      <span className="min-w-0 flex-1 space-y-0.5">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-ink">{company.name}</span>
+          {space && (
+            <span className="shrink-0 rounded bg-surface-muted px-1.5 py-px font-mono text-[11px] text-muted">
+              {space.code}
+            </span>
+          )}
+        </span>
+        <span className="block truncate text-xs text-muted">
+          {[company.industry?.name, company.tagline].filter(Boolean).join(" · ")}
+        </span>
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <AvailabilityBadge availability={company.availability} />
+          {team > 0 && (
+            <span className="text-xs text-muted">
+              {available > 0 ? `${available} of ${team} team available` : `${team} in the team`}
+            </span>
+          )}
+        </span>
+        {reason && <span className="block truncate text-xs text-brand-700">{reason}</span>}
+      </span>
+    </button>
   );
 }
 
@@ -190,6 +293,35 @@ function Details({
       <span aria-hidden="true">←</span> All companies
     </button>
   );
+
+  if (selection.type === "area") {
+    const { area } = selection;
+    const amenities = area.info?.amenities ?? [];
+    return (
+      <div className="space-y-3 p-5">
+        {back}
+        <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold text-ink outline-none">
+          {area.label}
+        </h2>
+        <p className="text-sm text-muted">{areaKindName(area.kind)} · open to everyone on the floor</p>
+        {area.info?.description && <p className="text-sm text-ink">{area.info.description}</p>}
+        {amenities.length > 0 && (
+          <section aria-labelledby="panel-amenities">
+            <h3 id="panel-amenities" className="text-sm font-semibold text-ink">
+              Amenities
+            </h3>
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {amenities.map((a) => (
+                <li key={a} className="rounded-full bg-surface-muted px-2.5 py-1 text-xs text-ink">
+                  {a}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    );
+  }
 
   if (selection.type === "space") {
     const { space } = selection;

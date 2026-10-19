@@ -32,6 +32,7 @@ export function FloorPlacement({ data }: { data: AdminFloorData }) {
     viewport,
     ready,
     zoom,
+    pixelsPerUnit,
     maxZoom,
     onPointerDown,
     consumeDrag,
@@ -97,6 +98,7 @@ export function FloorPlacement({ data }: { data: AdminFloorData }) {
             plan={plan}
             companiesBySpace={companiesBySpace}
             viewport={viewport}
+            pixelsPerUnit={pixelsPerUnit}
             selectedSpaceId={selectedId}
             hoveredSpaceId={hoveredId}
             onSelect={(space) => {

@@ -131,7 +131,11 @@ export const fixtureKindSchema = z.enum([
   "rug",
 ]);
 
-/** Furniture and equipment, drawn from the symbol library. Purely decorative. */
+/**
+ * Furniture and equipment, drawn from the symbol library. Purely decorative,
+ * except that a workstation chair may carry a `seat` number: the office's
+ * public team members are shown at seats 1, 2, 3 … in their team order.
+ */
 export const fixtureSchema = z.object({
   kind: fixtureKindSchema,
   x: coordinate,
@@ -139,6 +143,7 @@ export const fixtureSchema = z.object({
   width: z.number().positive().max(2_000),
   height: z.number().positive().max(2_000),
   rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0),
+  seat: z.number().int().min(1).max(500).optional(),
 });
 
 export const floorGeometrySchema = z.object({

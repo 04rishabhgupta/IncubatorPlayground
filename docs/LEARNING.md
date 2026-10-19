@@ -268,37 +268,39 @@ same. The new style can be seen with sample data at **`/admin/floor/preview`** (
 
 | Field                               | Example                                                                              | Notes                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `walls[].kind`, `walls[].thickness` | `{"kind": "interior"}`                                                               | `exterior` (8), `interior` (4), `glass` (3) units thick by default                                     |
+| `walls[].kind`, `walls[].thickness` | `{"kind": "interior"}`                                                               | `exterior` (16), `interior` (8), `glass` (8) units thick by default                                    |
 | `doors[]`                           | `{"x":180,"y":320,"width":50,"orientation":"horizontal","swing":-1,"kind":"single"}` | `swing` = which side it opens to; `hinge` = which end it turns on; also `double`, `sliding`, `opening` |
 | `windows[]`                         | `{"x":80,"y":20,"length":280,"orientation":"horizontal"}`                            | Drawn as glazing in the wall                                                                           |
-| `fixtures[]`                        | `{"kind":"desk","x":70,"y":90,"width":80,"height":46,"rotation":0}`                  | 26 kinds: desks, chairs, tables, sofas, kitchen, reception, stairs, lift…                              |
+| `fixtures[]`                        | `{"kind":"desk","x":70,"y":90,"width":80,"height":46,"rotation":0}`                  | 26 kinds: desks, chairs, tables, sofas, kitchen, reception, stairs, lift…; optional `seat` (4R.2)      |
 | `areas[].info`                      | `{"description":"…","amenities":["Sofa"]}`                                           | Used for clickable zones in 4R.3                                                                       |
 
 Every new field is **optional with a default** (zod `.default([])`, `.default("exterior")`). That is
 how you change a stored data format without a migration: old data still parses, and the new fields simply
-come back empty. `tests/unit/geometry-v2.test.ts` proves it by reading the real Floor 1 JSON out of
-`seed.sql` and parsing it with the new schema.
+come back empty. `tests/unit/geometry-v2.test.ts` proves it by parsing the original Floor 1 JSON (kept in
+`tests/db/fixtures/seed-floor-1-v1.sql`) with the new schema.
 
-**2. Draw once, reuse many times: `<symbol>` and `<use>`.**
-[floor-symbols.tsx](../src/components/floor/floor-symbols.tsx) defines each piece of furniture once inside
-`<defs>` as an SVG `<symbol>`. Every desk on the floor is then just
-`<use href="#…-fx-desk" x y width height>`, a few bytes instead of a copy of the drawing.
+**2. Furniture drawn for its real size.**
+[floor-symbols.tsx](../src/components/floor/floor-symbols.tsx) draws each piece for the exact box it is
+given, front edge at the top. (The first version stamped out stretched `<symbol>`s, which turned round
+chairs into ovals; the 4R.1 polish replaced it.)
 
-- `preserveAspectRatio="none"` lets rectangular pieces (desks, counters) stretch to any size.
-  `"xMidYMid meet"` keeps round ones (plants, chairs) round.
-- Colours are CSS variables from `globals.css` (`--color-furniture`, `--color-upholstery`…), set with inline
-  `style`. Variables _inherit_ into the `<use>` copy, so the whole palette can be retuned in one place.
-- `useId()` gives each map a unique id prefix, so two maps on one page never fight over `#desk`.
+- A long meeting table gets more chairs, a wide sofa more cushions; round tables stay round.
+- Lines use `vector-effect: non-scaling-stroke`, so outlines stay hairline-thin at every zoom.
+- Fine detail (monitors, keyboards, shelf divisions) sits in `.fp-detail` groups that CSS hides until you
+  zoom in (see 8 below).
+- Colours are CSS variables from `globals.css` (`--color-furniture`, `--color-upholstery`…), so the whole
+  palette can be retuned in one place.
 
 **3. Layers (the painter's algorithm).** SVG draws in document order: later elements cover earlier ones.
 [floor-map.tsx](../src/components/floor/floor-map.tsx) therefore paints, bottom to top:
 
 ```
-base        floor colour + dot texture + zone fills (corridor, lounge…)
+base        floor colour + zone fills (corridor, lounge…)
 rooms       each room's floor colour (tinted when hovered/selected)
-details     furniture (with a soft shadow) → walls → windows → doors → entrance
+details     furniture → walls (openings cut out with a mask) → windows → doors → entrance
+seats       team members at their desks (4R.2)
 area-labels zone names, above furniture so a sofa can't hide "LOUNGE"
-spaces      transparent click/focus target + labels + selection ring
+spaces      transparent click/focus target + label plate + selection ring
 ```
 
 The interactive layer is _on top_, so a click anywhere in an office reaches it even over a desk. The
@@ -322,21 +324,89 @@ M 150 200 A 50 50 0 0 1 100 250   ← move to the closed leaf's tip, then arc (r
 The sweep flag depends on which way the door opens and which end it hinges on. That's easy to get backwards,
 so the unit tests pin exact path strings, and a deliberately flipped flag made them fail (a mutation check).
 
-**6. Readable labels over a busy drawing.** Labels use `paint-order: stroke` with a white stroke (a
-"halo"): the outline is painted _behind_ the letters, so text stays legible on top of furniture.
+**6. Readable labels over a busy drawing.** Each room's label is a small card (a "plate") that
+[labels.ts](../src/lib/floor/labels.ts) puts in the clearest spot of the room: it tries the centre, then
+the aisles and sides, and takes the first spot that covers no furniture. Zone names use
+`paint-order: stroke` with a white stroke (a "halo") painted _behind_ the letters.
 
 **7. Testing a component without a browser.** `tests/unit/floor-map-render.test.tsx` renders `FloorMap` to
 an HTML string with `renderToStaticMarkup` and checks:
 
 - the layer order
-- one `<use>` per fixture
-- the counts of doors, windows and wall kinds
+- one drawn group per fixture
+- the counts of doors, windows and wall kinds, and the wall mask
+- the detail level, label sizes and team seats at different zooms
 - that every room is still a `role="button"`
 - that ids are unique across two maps
 
 Fast and deterministic. The Playwright suite then confirms nothing changed in the real app.
 
-### Accessibility
+**8. Text sized in screen pixels, detail by zoom.** The viewport hook reports `pixelsPerUnit` (container
+width ÷ viewBox width). Label sizes are `px / pixelsPerUnit` floor units, so a 14 px name stays 14 px at any
+zoom. `detailLevel()` turns the same number into `data-lod` 0 / 1 / 2 on the `<svg>`, and CSS in
+`globals.css` fades furniture and hides fine detail when zoomed out, without re-rendering the memoised layers.
+
+**9. Cutting holes with a mask.** Doors and windows are holes in the wall. Painting a floor-coloured
+rectangle over the wall looks right until the room is tinted (selected); then the patch shows. An SVG
+`<mask>` (white = keep, black = remove) cuts real holes, so whatever is underneath shows through.
+`wallAt()` finds the wall each opening sits on, so the hole is exactly as deep as that wall.
+
+### Phase 4R.2: Floor 1 as an architectural plan
+
+[layouts/floor-1.ts](../src/lib/floor/layouts/floor-1.ts) describes Floor 1 at 40 units per metre: shared
+20 cm partitions, a glazed boardroom front, doors, windows, 113 pieces of furniture and 12 numbered desks per
+office. Measurements are placeholders until the building's real plan is available.
+
+**1. Changing data that live rows point at.** `companies.space_id` references `floor_spaces.id` with
+`on delete set null`. Deleting and re-inserting the offices would quietly evict every company (and send
+"office removed" notifications). Migration
+[20261017090000_floor1_architectural_plan.sql](../supabase/migrations/20261017090000_floor1_architectural_plan.sql)
+therefore **updates rows in place, matched by code**: ids, labels and capacities stay; only shapes change.
+
+**2. A data migration that can't clobber edits.** It replaces the drawing only if it is still _exactly_ the
+original seed (`geometry = '…'::jsonb`; jsonb equality ignores key order and whitespace). A hand-edited layout
+is left alone, and running the migration twice is harmless.
+
+**3. Migrations run before the seed.** `supabase db reset` applies migrations, then `seed.sql`. On a fresh
+database there is no Floor 1 when the migration runs, so it does nothing and `seed.sql` inserts the new plan.
+The same JSON therefore lives in three places (TS module, migration, seed);
+`tests/unit/floor-1-layout.test.ts` fails if they ever drift apart.
+
+**4. Testing the upgrade path.** `createTestDatabase({ before, seed })` in the PGlite harness builds a
+database "as it was": migrations up to a file, then the old seed from `tests/db/fixtures`. The test places a
+company with a team, applies the new migration and checks that nothing it owns moved.
+
+**5. Team seating.** Workstation chairs carry a `seat` number, window row first.
+[seats.ts](../src/lib/floor/seats.ts) fills them with the company's _public_ team in team order (hidden
+members are never fetched). On the whole-floor view each occupied seat gets a status dot; close up, the
+member's initials ringed in their availability colour. More members than desks shows as "+N more in the
+team" on the label.
+
+**6. Status chips.** The room label shows availability as a tinted pill with a dot _and_ a word, so it
+never relies on colour alone.
+
+### Phase 4R.3: exploring the floor
+
+**1. Clickable areas.** Labelled zones people go to (lounge, pantry; not corridors, see
+`isSelectableArea`) get a button in the map's top layer, like rooms. Selecting one sets `?area=<key>` and
+the side panel shows its description and amenities. The admin placement tool doesn't pass `onSelectArea`,
+so there areas stay decoration.
+
+**2. Keyboard room navigation.** Every room and area button carries `data-nav-id`. When focus is on one,
+the arrow keys call [navigation.ts](../src/lib/floor/navigation.ts) `nearestInDirection()`: the nearest
+target whose centre lies ahead within a 2:1 cone, with sideways distance counting double, so the room
+straight ahead wins over a closer diagonal one. Focus moves there, and the map pans to keep it in view.
+Arrows elsewhere on the map still pan. This is the "roving focus" pattern of a grid, adapted to rooms that
+aren't in a grid.
+
+**3. Wider search.** [search.ts](../src/lib/floor/search.ts) normalises text (lower case, accents removed
+with `normalize("NFD")`) and requires _every_ word of the query to match some field: company name,
+industry, tagline, office number, team member names and roles, and for shared places their name, kind and
+amenities. Each result says _why_ it matched when the name doesn't ("Team: Asha Rao", "Amenity: Coffee
+machine"); field order decides which reason wins.
+
+**4. Richer list cards.** Each company shows its office number, industry and tagline, its availability,
+and how many of its team are available. Shared rooms and areas are listed under **Places**.
 
 Each office is `role="button"`, focusable with Tab and selectable with Enter or Space. Its label reads like
 "Office 101, Acme Robotics, Available". The company list is an equivalent text alternative. Availability
@@ -566,15 +636,17 @@ Not every clash is forbidden:
 
 ## 9. What each phase added
 
-| Phase               | Concepts introduced                                                                                                              | Key files                                                                                                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 Foundation        | Migrations, RLS, grants, guard triggers, PGlite tests, validated env                                                             | `supabase/migrations/2026101210*`, `tests/db/harness.ts`, `src/lib/env*.ts`                                                                                     |
-| 2 Auth              | Supabase Auth with cookies, Data Access Layer, Server Actions, signup trigger, Playwright                                        | `src/lib/auth/*`, `src/proxy.ts`, `src/app/(auth)/*`                                                                                                            |
-| 3 Directory         | Review workflow via triggers, notifications, Storage uploads, URL-synced filters                                                 | `src/lib/companies/*`, `src/lib/admin/actions.ts`, `20261014090000_company_review.sql`                                                                          |
-| 4 Floor map         | SVG `viewBox` zoom/pan, pure viewport maths, History API selection, data-driven geometry                                         | `src/lib/floor/*`, `src/components/floor/*`, `src/components/admin/floor-placement.tsx`                                                                         |
-| 5 Availability      | Upserts, "no row = Unknown", Realtime + `router.refresh`, public vs owner views                                                  | `src/lib/availability/*`, `src/components/availability/*`, `src/components/realtime/live-refresh.tsx`                                                           |
-| 6 Appointments      | UTC vs wall time, DST, half-open ranges, exclusion constraint, state machine, privacy-preserving RPC, Post/Redirect/Get          | `src/lib/appointments/*`, `src/components/appointments/*`, migrations `20261016090000` and `20261016100000`                                                     |
-| 4R.1 Floor renderer | Backward-compatible schema defaults, SVG `<symbol>`/`<use>`, layering, `React.memo`, SVG arcs, `paint-order` halos, render tests | `src/lib/floor/geometry.ts`, `src/lib/floor/drawing.ts`, `src/components/floor/floor-symbols.tsx`, `src/components/floor/floor-map.tsx`, `/admin/floor/preview` |
+| Phase               | Concepts introduced                                                                                                        | Key files                                                                                                                                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 Foundation        | Migrations, RLS, grants, guard triggers, PGlite tests, validated env                                                       | `supabase/migrations/2026101210*`, `tests/db/harness.ts`, `src/lib/env*.ts`                                                                                                                |
+| 2 Auth              | Supabase Auth with cookies, Data Access Layer, Server Actions, signup trigger, Playwright                                  | `src/lib/auth/*`, `src/proxy.ts`, `src/app/(auth)/*`                                                                                                                                       |
+| 3 Directory         | Review workflow via triggers, notifications, Storage uploads, URL-synced filters                                           | `src/lib/companies/*`, `src/lib/admin/actions.ts`, `20261014090000_company_review.sql`                                                                                                     |
+| 4 Floor map         | SVG `viewBox` zoom/pan, pure viewport maths, History API selection, data-driven geometry                                   | `src/lib/floor/*`, `src/components/floor/*`, `src/components/admin/floor-placement.tsx`                                                                                                    |
+| 5 Availability      | Upserts, "no row = Unknown", Realtime + `router.refresh`, public vs owner views                                            | `src/lib/availability/*`, `src/components/availability/*`, `src/components/realtime/live-refresh.tsx`                                                                                      |
+| 6 Appointments      | UTC vs wall time, DST, half-open ranges, exclusion constraint, state machine, privacy-preserving RPC, Post/Redirect/Get    | `src/lib/appointments/*`, `src/components/appointments/*`, migrations `20261016090000` and `20261016100000`                                                                                |
+| 4R.1 Floor renderer | Backward-compatible schema defaults, size-aware SVG drawing, layering, `React.memo`, SVG arcs and masks, screen-pixel text | `src/lib/floor/geometry.ts`, `src/lib/floor/drawing.ts`, `src/lib/floor/labels.ts`, `src/components/floor/floor-symbols.tsx`, `src/components/floor/floor-map.tsx`, `/admin/floor/preview` |
+| 4R.3 Exploring      | Directional focus navigation, accent-insensitive multi-word search with match reasons, URL state for areas                 | `src/lib/floor/navigation.ts`, `src/lib/floor/search.ts`, `src/components/floor/explorer-panel.tsx`, `src/components/floor/floor-explorer.tsx`                                             |
+| 4R.2 Floor 1 plan   | In-place data migrations, guarded updates, migration-vs-seed order, upgrade-path DB tests, team seating                    | `src/lib/floor/layouts/floor-1.ts`, `src/lib/floor/seats.ts`, `20261017090000_floor1_architectural_plan.sql`, `tests/db/floor-layout.test.ts`                                              |
 
 **Phase 7 preview:** sending email from the server (Resend), rate limiting, and real-time chat with read receipts.
 

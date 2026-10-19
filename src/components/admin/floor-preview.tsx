@@ -2,10 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { FloorMap } from "@/components/floor/floor-map";
-import { FIXTURE_SYMBOLS, FloorDefs, symbolId } from "@/components/floor/floor-symbols";
+import { FIXTURE_KINDS, FIXTURES, FixtureShape } from "@/components/floor/floor-symbols";
 import { MapControls, MapLegend } from "@/components/floor/map-controls";
 import { useMapViewport } from "@/components/floor/use-map-viewport";
-import type { FixtureKind } from "@/lib/floor/geometry";
 import type { FloorPlan } from "@/lib/floor/queries";
 
 /**
@@ -24,6 +23,7 @@ export function FloorPreview({ plan }: { plan: FloorPlan }) {
     viewport,
     ready,
     zoom,
+    pixelsPerUnit,
     maxZoom,
     onPointerDown,
     consumeDrag,
@@ -49,6 +49,7 @@ export function FloorPreview({ plan }: { plan: FloorPlan }) {
           plan={plan}
           companiesBySpace={companiesBySpace}
           viewport={viewport}
+          pixelsPerUnit={pixelsPerUnit}
           selectedSpaceId={selected}
           hoveredSpaceId={hovered}
           onSelect={(space) => {
@@ -70,19 +71,20 @@ export function FloorPreview({ plan }: { plan: FloorPlan }) {
       </div>
 
       <section aria-labelledby="symbols-heading">
-        <h2 id="symbols-heading" className="mb-3 text-lg font-semibold text-ink">
-          Furniture symbols ({Object.keys(FIXTURE_SYMBOLS).length})
+        <h2 id="symbols-heading" className="mb-1 text-lg font-semibold text-ink">
+          Furniture symbols ({FIXTURE_KINDS.length})
         </h2>
-        <svg width="0" height="0" className="absolute" aria-hidden="true">
-          <FloorDefs prefix="gallery" />
-        </svg>
+        <p className="mb-3 text-sm text-muted">
+          Each piece is drawn at its default real-world size (40 floor units per metre) and adapts to the box
+          it is given.
+        </p>
         <ul className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-7">
-          {(Object.keys(FIXTURE_SYMBOLS) as FixtureKind[]).map((kind) => {
-            const [, , w, h] = FIXTURE_SYMBOLS[kind].viewBox.split(" ").map(Number);
+          {FIXTURE_KINDS.map((kind) => {
+            const [w, h] = FIXTURES[kind].size;
             return (
               <li key={kind} className="rounded-lg border border-border bg-floor p-2 text-center">
                 <svg viewBox={`-4 -4 ${w + 8} ${h + 8}`} className="mx-auto h-16 w-full" aria-hidden="true">
-                  <use href={`#${symbolId("gallery", kind)}`} x={0} y={0} width={w} height={h} />
+                  <FixtureShape kind={kind} width={w} height={h} />
                 </svg>
                 <span className="mt-1 block font-mono text-xs text-muted">{kind}</span>
               </li>

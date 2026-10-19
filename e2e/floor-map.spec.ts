@@ -105,6 +105,39 @@ test("works with the keyboard", async ({ page }) => {
   await expect.poll(async () => (await viewBox(page)).width).toBeCloseTo(fit.width, 0);
 });
 
+test("arrow keys move between rooms, and shared areas open their details", async ({ page }) => {
+  await openMap(page);
+  await office(page, "101").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(office(page, "102")).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(office(page, "BR-1")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL("/?space=BR-1");
+
+  await page.keyboard.press("Escape");
+  await map(page)
+    .getByRole("button", { name: /^Lounge, shared space/ })
+    .click();
+  await expect(page).toHaveURL("/?area=lounge");
+  await expect(panel(page).getByRole("heading", { name: "Lounge" })).toBeVisible();
+});
+
+test("search finds team members and shared places", async ({ page }) => {
+  await openMap(page);
+  const list = panel(page);
+  const search = list.getByRole("searchbox", { name: "Search companies on this floor" });
+
+  await search.fill("Kiran");
+  await expect(list.getByRole("button", { name: new RegExp(alpha().name) })).toBeVisible();
+  await expect(list.getByText("Team: Kiran Das")).toBeVisible();
+
+  await search.fill("boardroom");
+  await expect(list.getByRole("button", { name: new RegExp(alpha().name) })).toHaveCount(0);
+  await list.getByRole("button", { name: /Boardroom/ }).click();
+  await expect(page).toHaveURL("/?space=BR-1");
+});
+
 test("list and map stay in sync, and search dims non-matching offices", async ({ page }) => {
   await openMap(page);
   const list = panel(page);

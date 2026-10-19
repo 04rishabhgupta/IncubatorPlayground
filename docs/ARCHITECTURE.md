@@ -168,7 +168,7 @@ page.tsx (server) ── getFloorPlan(?floor) ──► floors, layout, spaces, 
 - **Zoom and pan:** these change the SVG `viewBox` (the visible rectangle of floor coordinates), so text
   stays sharp. The viewBox keeps the container's aspect ratio. Zoom is limited to 1–4×, and panning
   stops at the edges of the floor.
-- **Selection lives in the URL:** `?company=<slug>` or `?space=<code>`, updated with
+- **Selection lives in the URL:** `?company=<slug>`, `?space=<code>` or `?area=<key>`, updated with
   `history.pushState`. Deep links and the back button work, and the floor data isn't reloaded.
 - **Admin placement:** `/admin/floor` reuses the same map. A company can only move into a vacant
   office, because `companies.space_id` is unique (no swaps). A trigger notifies the company whenever
@@ -222,8 +222,15 @@ page.tsx (server) ── getFloorPlan(?floor) ──► floors, layout, spaces, 
    - `doors[]`: `{ x, y, width, orientation, swing: 1 | -1, hinge: "start" | "end", kind: "single" | "double" | "sliding" | "opening" }`.
      The opening runs from (x, y) along the wall; `swing` is the side the leaf opens towards.
    - `windows[]`: `{ x, y, length, orientation }`, on exterior walls.
-   - `fixtures[]`: `{ kind, x, y, width, height, rotation: 0 | 90 | 180 | 270 }`. The kinds are listed in
-     `fixtureKindSchema` and drawn from `src/components/floor/floor-symbols.tsx`. Purely decorative.
+   - `fixtures[]`: `{ kind, x, y, width, height, rotation: 0 | 90 | 180 | 270, seat? }`. The kinds are listed in
+     `fixtureKindSchema` and drawn from `src/components/floor/floor-symbols.tsx` at the size given. Decorative,
+     except that a workstation chair with a `seat` number shows the office's public team member at that
+     position (seat 1 = first member in team order).
+
+   Floor 1's drawing is generated from `src/lib/floor/layouts/floor-1.ts` (40 units = 1 m). The same JSON is
+   in `seed.sql` and migration `20261017090000`, and a unit test keeps the three in sync. To change an existing
+   floor, update `floor_spaces` rows **in place** (matched by code), never delete and re-insert them:
+   `companies.space_id` is `on delete set null`.
 
    Preview any change at `/admin/floor/preview` (sample data) before writing it to the database.
 
