@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { floorGeometrySchema } from "@/lib/floor/geometry";
 import { FLOOR_1_SPACES, floor1Geometry } from "@/lib/floor/layouts/floor-1";
-import { applyMigration, as, createAuthUser, createTestDatabase, user, type Db } from "./harness";
+import { anon, applyMigration, as, createAuthUser, createTestDatabase, user, type Db } from "./harness";
 
 /**
  * Phase 4R.2 data migration: Floor 1 becomes an architectural plan without
@@ -126,5 +126,55 @@ describe("Floor 1 architectural plan migration", () => {
     const db = await createTestDatabase();
     expect((await layout(db)).geometry).toEqual(plain(floor1Geometry));
     for (const s of await spaces(db)) expect(s.shape).toEqual(FLOOR_1_SPACES[s.code]);
+  });
+
+  it("adds tagline and description to floors and updates Floor 1 metadata", async () => {
+    const db = await createTestDatabase({ before: "20261019120000_floor_metadata.sql", seed: V1_SEED });
+    const { rows: beforeRows } = await db.query<{ id: string; name: string }>(
+      `select id, name from public.floors where id = $1`,
+      [FLOOR_ID],
+    );
+    expect(beforeRows).toHaveLength(1);
+
+    await applyMigration(db, "20261019120000_floor_metadata.sql");
+
+    const { rows: afterRows } = await db.query<{
+      id: string;
+      name: string;
+      tagline: string | null;
+      description: string | null;
+    }>(`select id, name, tagline, description from public.floors where id = $1`, [FLOOR_ID]);
+    expect(afterRows[0].tagline).toBe("Deep tech, robotics & AI incubation");
+    expect(afterRows[0].description).toContain("Home to early-stage deep tech ventures");
+  });
+});
+
+describe("floor settings (Phase 4R.4)", () => {
+  it("lets the admin hide a floor from visitors and still manage it", async () => {
+    const db = await createTestDatabase();
+    const adminId = await createAuthUser(db, "admin@example.com");
+    await db.query(`update public.profiles set role = 'super_admin' where id = $1`, [adminId]);
+    const visitorId = await createAuthUser(db, "visitor@example.com");
+    const visibleTo = async (actor: Parameters<typeof as>[1]) =>
+      (await as<{ slug: string }>(db, actor, `select slug from public.floors`)).rows.map((r) => r.slug);
+
+    await as(
+      db,
+      user(adminId),
+      `update public.floors set is_active = false, tagline = 'Closed for fit-out' where id = $1`,
+      [FLOOR_ID],
+    );
+
+    expect(await visibleTo(anon)).toEqual([]);
+    expect(await visibleTo(user(visitorId))).toEqual([]);
+    // The admin tools load inactive floors too, so it can be switched back on.
+    expect(await visibleTo(user(adminId))).toEqual(["floor-1"]);
+
+    // Nobody else can change floor settings.
+    await expect(
+      as(db, user(visitorId), `update public.floors set is_active = true where id = $1 returning id`, [
+        FLOOR_ID,
+      ]),
+    ).resolves.toMatchObject({ rows: [] });
   });
 });

@@ -13,9 +13,11 @@ values ('00000000-0000-4000-8000-000000000001',
         'Incubation Centre', 'incubation-centre', null, 'Asia/Kolkata')
 on conflict (id) do nothing;
 
-insert into public.floors (id, building_id, name, slug, level)
+insert into public.floors (id, building_id, name, slug, level, tagline, description)
 values ('00000000-0000-4000-8000-000000000101',
-        '00000000-0000-4000-8000-000000000001', 'Floor 1', 'floor-1', 1)
+        '00000000-0000-4000-8000-000000000001', 'Floor 1', 'floor-1', 1,
+        'Deep tech, robotics & AI incubation',
+        'Home to early-stage deep tech ventures, shared prototyping zones, boardroom and collaboration lounges.')
 on conflict (id) do nothing;
 
 insert into public.floor_layouts (floor_id, width, height, geometry)

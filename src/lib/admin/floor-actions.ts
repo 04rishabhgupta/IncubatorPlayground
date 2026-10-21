@@ -140,3 +140,53 @@ export async function updateSpaceDetails(_prev: FormState, formData: FormData): 
   revalidateFloor();
   return { status: "success", message: "Space details saved." };
 }
+
+const floorDetailsSchema = z.object({
+  floorId: z.string().uuid("Invalid floor id."),
+  name: z.string().trim().min(1, "Enter a floor name.").max(60, "Keep the name under 60 characters."),
+  tagline: z
+    .string()
+    .trim()
+    .max(160, "Keep the tagline under 160 characters.")
+    .optional()
+    .transform((v) => v || null),
+  description: z
+    .string()
+    .trim()
+    .max(1000, "Keep the description under 1000 characters.")
+    .optional()
+    .transform((v) => v || null),
+  isActive: z
+    .string()
+    .optional()
+    .transform((v) => v === "true" || v === "on"),
+});
+
+export async function updateFloorDetails(_prev: FormState, formData: FormData): Promise<FormState> {
+  if (!(await requireAdmin()))
+    return { status: "error", message: "Only the platform admin can edit floors." };
+
+  const parsed = floorDetailsSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { status: "error", fieldErrors: fieldErrorsFrom(parsed.error) };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("floors")
+    .update({
+      name: parsed.data.name,
+      tagline: parsed.data.tagline,
+      description: parsed.data.description,
+      is_active: parsed.data.isActive,
+    })
+    .eq("id", parsed.data.floorId)
+    .select("slug, name")
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error("Floor update failed", error);
+    return { status: "error", message: "The floor details couldn't be saved." };
+  }
+
+  revalidateFloor();
+  return { status: "success", message: `${data.name} details saved.` };
+}

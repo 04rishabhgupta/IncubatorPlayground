@@ -10,7 +10,14 @@ import { floorGeometrySchema, shapeSchema, type FloorGeometry, type Shape } from
  * companies to approved ones (plus nothing private).
  */
 
-export type FloorSummary = { id: string; slug: string; name: string; level: number };
+export type FloorSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  level: number;
+  tagline: string | null;
+  description: string | null;
+};
 
 export type MapSpace = {
   id: string;
@@ -44,7 +51,7 @@ export type MapCompany = {
 };
 
 export type FloorPlan = {
-  building: { name: string; timezone: string } | null;
+  building: { name: string; timezone: string; address: string | null } | null;
   floors: FloorSummary[];
   floor: FloorSummary;
   layout: { width: number; height: number; geometry: FloorGeometry };
@@ -62,15 +69,24 @@ const companyColumns =
   "availability:company_availability(status, note, updated_at), " +
   "team:company_team_members(id, full_name, job_title, sort_order, availability:member_availability(status, updated_at))";
 
-/** Loads a floor by slug, or the lowest active floor when no slug is given or it doesn't exist. */
-export async function getFloorPlan(floorSlug?: string): Promise<FloorPlanResult> {
+/**
+ * Loads a floor by slug, or the lowest active floor when no slug is given or it doesn't exist.
+ * `includeInactive` is for the admin tools: a floor hidden from visitors must stay editable, or
+ * switching it off would lock the admin out of switching it back on. (RLS only returns inactive
+ * floors to super admins anyway.)
+ */
+export async function getFloorPlan(
+  floorSlug?: string,
+  { includeInactive = false }: { includeInactive?: boolean } = {},
+): Promise<FloorPlanResult> {
   const supabase = await createClient();
 
-  const { data: floors, error: floorsError } = await supabase
+  let floorsQuery = supabase
     .from("floors")
-    .select("id, slug, name, level, building:buildings(name, timezone)")
-    .eq("is_active", true)
+    .select("id, slug, name, level, tagline, description, building:buildings(name, timezone, address)")
     .order("level");
+  if (!includeInactive) floorsQuery = floorsQuery.eq("is_active", true);
+  const { data: floors, error: floorsError } = await floorsQuery;
   if (floorsError) throw floorsError;
   if (!floors?.length) return { status: "no-floor" };
 
@@ -115,8 +131,22 @@ export async function getFloorPlan(floorSlug?: string): Promise<FloorPlanResult>
     status: "ok",
     plan: {
       building: floor.building,
-      floors: floors.map(({ id, slug, name, level }) => ({ id, slug, name, level })),
-      floor: { id: floor.id, slug: floor.slug, name: floor.name, level: floor.level },
+      floors: floors.map(({ id, slug, name, level, tagline, description }) => ({
+        id,
+        slug,
+        name,
+        level,
+        tagline,
+        description,
+      })),
+      floor: {
+        id: floor.id,
+        slug: floor.slug,
+        name: floor.name,
+        level: floor.level,
+        tagline: floor.tagline,
+        description: floor.description,
+      },
       layout: { width: layoutRes.data.width, height: layoutRes.data.height, geometry: geometry.data },
       spaces,
       companies: companiesRes.data ?? [],

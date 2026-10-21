@@ -47,9 +47,25 @@ const sampleCompany = (
 const space = (code: string): Shape => FLOOR_1_SPACES[code];
 
 export const demoFloorPlan: FloorPlan = {
-  building: { name: "Sample building", timezone: "Asia/Kolkata" },
-  floors: [{ id: "demo-floor", slug: "demo", name: "Sample floor", level: 1 }],
-  floor: { id: "demo-floor", slug: "demo", name: "Sample floor", level: 1 },
+  building: { name: "Sample building", timezone: "Asia/Kolkata", address: "Tech Park, Block B" },
+  floors: [
+    {
+      id: "demo-floor",
+      slug: "demo",
+      name: "Sample floor",
+      level: 1,
+      tagline: "Prototyping & hardware hub",
+      description: "Dedicated spaces for prototyping, electronics and early testing.",
+    },
+  ],
+  floor: {
+    id: "demo-floor",
+    slug: "demo",
+    name: "Sample floor",
+    level: 1,
+    tagline: "Prototyping & hardware hub",
+    description: "Dedicated spaces for prototyping, electronics and early testing.",
+  },
   layout: { ...FLOOR_1_SIZE, geometry: demoGeometry },
   spaces: [
     {

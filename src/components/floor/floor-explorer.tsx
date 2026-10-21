@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
@@ -7,6 +8,7 @@ import { shapeBounds, type Bounds, type FloorArea } from "@/lib/floor/geometry";
 import { arrowDirections, nearestInDirection } from "@/lib/floor/navigation";
 import type { FloorPlan, MapCompany, MapSpace } from "@/lib/floor/queries";
 import { matchArea, matchCompany, matchSpace } from "@/lib/floor/search";
+import { BuildingPanel } from "./building-panel";
 import { ExplorerPanel, type CompanyResult, type PanelSelection, type PlaceResult } from "./explorer-panel";
 import { FloorMap, areaAccessibleName, isSelectableArea, navId, spaceAccessibleName } from "./floor-map";
 import { MapControls, MapLegend } from "./map-controls";
@@ -21,6 +23,7 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const rootRef = useRef<HTMLDivElement>(null);
+  const [isBuildingPanelOpen, setIsBuildingPanelOpen] = useState(false);
 
   const content = useMemo(
     () => ({ x: 0, y: 0, width: plan.layout.width, height: plan.layout.height }),
@@ -238,14 +241,76 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
       className="grid scroll-mt-16 gap-4 lg:h-[calc(100svh-4rem-2rem)] lg:min-h-[560px] lg:grid-cols-[minmax(0,1fr)_380px]"
     >
       <section aria-labelledby="floor-heading" className="flex min-h-0 flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h1 id="floor-heading" className="text-lg font-semibold text-ink">
-              {plan.floor.name}
-            </h1>
-            {plan.building && <p className="text-sm text-muted">{plan.building.name}</p>}
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 id="floor-heading" className="text-lg font-bold text-ink">
+                    {plan.floor.name}
+                  </h1>
+                  <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-semibold text-muted border border-border">
+                    Level {plan.floor.level}
+                  </span>
+                </div>
+                {plan.floor.tagline && (
+                  <p className="text-sm font-medium text-brand-700">{plan.floor.tagline}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Floor Tabs */}
+              <nav
+                aria-label="Floors"
+                className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted/50 p-1"
+              >
+                {plan.floors.map((floor) => {
+                  const isActive = floor.slug === plan.floor.slug;
+                  return (
+                    <Link
+                      key={floor.id}
+                      href={`/?floor=${floor.slug}`}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "rounded-md px-3 py-1 text-xs font-semibold transition-all",
+                        isActive
+                          ? "bg-brand-600 text-white shadow-xs"
+                          : "text-muted hover:bg-surface hover:text-ink",
+                      )}
+                    >
+                      {floor.name}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {/* Building Overview Button */}
+              <button
+                type="button"
+                onClick={() => setIsBuildingPanelOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-muted hover:text-ink transition-colors"
+                aria-label="View building overview"
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  className="size-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path d="M3 17h14M5 17V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v13M8 7h1m2 0h1M8 10h1m2 0h1M8 13h1m2 0h1" />
+                </svg>
+                <span>Building</span>
+              </button>
+            </div>
           </div>
-          {plan.floors.length > 1 && <FloorSelector floors={plan.floors} current={plan.floor.slug} />}
+
+          {plan.floor.description && (
+            <p className="text-xs text-muted border-t border-border pt-2 leading-relaxed">
+              {plan.floor.description}
+            </p>
+          )}
         </div>
 
         <div
@@ -330,6 +395,14 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
         }}
         onClose={clearSelection}
       />
+
+      <BuildingPanel
+        building={plan.building}
+        floors={plan.floors}
+        currentFloorSlug={plan.floor.slug}
+        isOpen={isBuildingPanelOpen}
+        onClose={() => setIsBuildingPanelOpen(false)}
+      />
     </div>
   );
 }
@@ -372,31 +445,5 @@ function Tooltip({
       <p className="font-semibold">{title}</p>
       <p className="text-white/75">{detail}</p>
     </div>
-  );
-}
-
-function FloorSelector({ floors, current }: { floors: FloorPlan["floors"]; current: string }) {
-  return (
-    <form method="get" action="/" className="flex items-center gap-2">
-      <label htmlFor="floor" className="text-sm text-muted">
-        Floor
-      </label>
-      <select
-        id="floor"
-        name="floor"
-        defaultValue={current}
-        onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="h-9 rounded-lg border border-border bg-surface px-2 text-sm"
-      >
-        {floors.map((f) => (
-          <option key={f.id} value={f.slug}>
-            {f.name}
-          </option>
-        ))}
-      </select>
-      <noscript>
-        <button type="submit">Go</button>
-      </noscript>
-    </form>
   );
 }

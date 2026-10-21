@@ -66,9 +66,10 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 - [x] 4R.1 Admin renderer preview with sample data (`/admin/floor/preview`); render + geometry tests
 - [x] 4R.1 polish: solid walls with masked openings, doors hinged on the wall face, framed glazing, size-aware furniture, label plates clear of furniture, screen-pixel text, three detail levels
 - [x] 4R.2 Floor 1 redesign (data migration, ids 101–104 unchanged), office seats from team order, status chips, zoom-dependent labels
-- [ ] 4R.2 follow-up: replace placeholder measurements with the building's real plan; apply migration `20261017090000` to the hosted project (`npm run db:push`)
+- [x] 4R.2 follow-up: apply migration `20261017090000` to the hosted project (`npm run db:push`)
+- [ ] 4R.2 follow-up: replace placeholder measurements with the building's real plan (waiting for drawings)
 - [x] 4R.3 Clickable areas, keyboard room navigation, wider search, richer list cards
-- [ ] 4R.4 Floor tabs + building panel, floor tagline/description, admin floor management
+- [x] 4R.4 Floor tabs + building panel, floor tagline/description, admin floor management
 - [ ] 4R.5 Startup stage / team size / tech stack, FITT Incubation Team, announcements, requested office
 - [ ] 4R.6 Admin layout JSON editor with live preview, validation and history; occupancy overview
 - [ ] 4R.7 Full regression, docs

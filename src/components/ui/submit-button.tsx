@@ -10,6 +10,7 @@ export function SubmitButton({
   pendingLabel,
   className,
   variant,
+  size,
   name,
   value,
 }: {
@@ -17,6 +18,7 @@ export function SubmitButton({
   pendingLabel?: string;
   className?: string;
   variant?: ComponentProps<typeof Button>["variant"];
+  size?: ComponentProps<typeof Button>["size"];
   name?: string;
   value?: string;
 }) {
@@ -25,6 +27,7 @@ export function SubmitButton({
     <Button
       type="submit"
       variant={variant}
+      size={size}
       name={name}
       value={value}
       disabled={pending}
