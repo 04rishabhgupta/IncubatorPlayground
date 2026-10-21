@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type Table = "company_availability" | "member_availability" | "appointments";
+type Table = "company_availability" | "member_availability" | "appointments" | "messages";
 
 /**
  * Re-fetches the current page's server data when rows in the given tables

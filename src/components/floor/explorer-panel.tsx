@@ -11,6 +11,7 @@ import { STARTUP_STAGES, stageLabel, teamSizeLabel } from "@/lib/companies/start
 import type { IncubatorStaff, MapCompany, MapSpace } from "@/lib/floor/queries";
 import { FittTeamList } from "./fitt-team";
 import { areaKindName } from "@/lib/floor/search";
+import { MessageButton } from "@/components/messages/message-button";
 
 type Industry = { slug: string; name: string };
 
@@ -481,6 +482,11 @@ function Details({
         >
           Request an appointment
         </Link>
+        <MessageButton
+          companyId={company.id}
+          companyName={company.name}
+          returnTo={`/?company=${company.slug}`}
+        />
       </div>
     </div>
   );

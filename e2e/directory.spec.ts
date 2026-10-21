@@ -91,7 +91,7 @@ test("the approved company is searchable, filterable and has a public profile", 
   await expect(card.getByText("Unknown")).toBeVisible(); // availability never set
 
   await card.click();
-  await expect(page.getByRole("heading", { name: accounts.company.companyName })).toBeVisible();
+  await expect(page.getByRole("heading", { name: accounts.company.companyName, level: 1 })).toBeVisible();
   await expect(page.getByText("Robot arms")).toBeVisible();
   await expect(page.getByRole("link", { name: "e2e-robotics.dev" })).toHaveAttribute(
     "href",

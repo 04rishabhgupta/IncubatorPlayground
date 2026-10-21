@@ -4,11 +4,11 @@ import { getPublicEnv } from "@/lib/env";
  * Deterministic date formatting in the platform timezone (no "x minutes ago",
  * which would depend on the current time during rendering).
  */
-export function formatDate(value: string | Date, style: "date" | "datetime" = "date") {
+export function formatDate(value: string | Date, style: "date" | "datetime" | "time" = "date") {
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("en-IN", {
     timeZone: getPublicEnv().NEXT_PUBLIC_DEFAULT_TIMEZONE,
-    dateStyle: "medium",
+    ...(style === "time" ? { timeStyle: "short" } : { dateStyle: "medium" }),
     ...(style === "datetime" ? { timeStyle: "short" } : {}),
   }).format(date);
 }

@@ -3,11 +3,13 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { ownCompany } from "@/lib/companies/owner";
 import { fieldErrorsFrom, formValues, type FormState } from "@/lib/forms";
 import { createClient } from "@/lib/supabase/server";
 import { bookingSchema, cancelSchema, responseSchema } from "@/lib/validation/appointments";
+import { emailAppointment } from "./email";
 import { checkSlot, overlaps } from "./rules";
 import { getBookingContext, getBusyTimes } from "./queries";
 import { wallTimeToUtc } from "./time";
@@ -93,23 +95,31 @@ export async function requestAppointment(_prev: FormState, formData: FormData): 
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("appointments").insert({
-    company_id: context.company.id,
-    requester_id: session.userId,
-    member_id: input.memberId ?? null,
-    starts_at: slot.start.toISOString(),
-    ends_at: slot.end.toISOString(),
-    meeting_type: input.meetingType,
-    purpose: input.purpose,
-  });
-  if (error) {
+  const { data: created, error } = await supabase
+    .from("appointments")
+    .insert({
+      company_id: context.company.id,
+      requester_id: session.userId,
+      member_id: input.memberId ?? null,
+      starts_at: slot.start.toISOString(),
+      ends_at: slot.end.toISOString(),
+      meeting_type: input.meetingType,
+      purpose: input.purpose,
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
     return {
       status: "error",
-      message: friendlyError(error, "Your request couldn't be sent. Please try again."),
+      message: error
+        ? friendlyError(error, "Your request couldn't be sent. Please try again.")
+        : "Your request couldn't be sent. Please try again.",
       values,
     };
   }
 
+  // Email copies go out after the response, so they never slow down or fail the request.
+  after(() => emailAppointment(created.id, "requested", session.userId));
   revalidateAppointments();
   redirect("/account/appointments?done=requested");
 }
@@ -156,6 +166,7 @@ export async function respondToAppointment(_prev: FormState, formData: FormData)
       values,
     };
   }
+  after(() => emailAppointment(data.id, input.decision === "accept" ? "accepted" : "rejected", ctx.userId));
   revalidateAppointments();
   // The item leaves the "Requests" tab, so confirm at page level rather than in the card.
   redirect(`/company/appointments?tab=pending&done=${input.decision === "accept" ? "accepted" : "declined"}`);
@@ -183,6 +194,7 @@ export async function cancelAppointment(_prev: FormState, formData: FormData): P
     return { status: "error", message: friendlyError(error, "The appointment couldn't be cancelled.") };
   if (!data)
     return { status: "error", message: "This appointment can no longer be cancelled. Refresh the page." };
+  after(() => emailAppointment(data.id, "cancelled", session.userId));
   revalidateAppointments();
   redirect(
     data.requester_id === session.userId

@@ -15,6 +15,7 @@ import { countPendingRequests } from "@/lib/appointments/queries";
 import { getCompanyAvailability, getOwnTeam } from "@/lib/availability/queries";
 import { getOwnOfficeRequest, listRequestableOffices } from "@/lib/companies/office-request";
 import { getOwnCompany } from "@/lib/companies/queries";
+import { countUnreadMessages } from "@/lib/messages/queries";
 import { stageLabel, teamSizeLabel } from "@/lib/companies/startup";
 import { formatDate } from "@/lib/format";
 
@@ -48,6 +49,7 @@ export default async function CompanyDashboardPage() {
 
   let company, availability;
   let pendingRequests = 0;
+  let unreadMessages = 0;
   let team: Awaited<ReturnType<typeof getOwnTeam>> = [];
   let officeRequest: Awaited<ReturnType<typeof getOwnOfficeRequest>> = null;
   let offices: Awaited<ReturnType<typeof listRequestableOffices>> = [];
@@ -55,12 +57,13 @@ export default async function CompanyDashboardPage() {
     company = await getOwnCompany(userId);
     if (company) {
       const needsOffice = company.status === "approved" && !company.space;
-      [availability, team, pendingRequests, officeRequest, offices] = await Promise.all([
+      [availability, team, pendingRequests, officeRequest, offices, unreadMessages] = await Promise.all([
         getCompanyAvailability(company.id),
         getOwnTeam(company.id),
         countPendingRequests(company.id),
         needsOffice ? getOwnOfficeRequest(company.id) : null,
         needsOffice ? listRequestableOffices() : [],
+        countUnreadMessages(),
       ]);
     }
   } catch (error) {
@@ -115,6 +118,12 @@ export default async function CompanyDashboardPage() {
             )}
             <ButtonLink href="/company/appointments" variant="secondary">
               Appointments{pendingRequests > 0 ? ` (${pendingRequests} new)` : ""}
+            </ButtonLink>
+            <ButtonLink href="/messages" variant="secondary">
+              Messages{unreadMessages > 0 ? ` (${unreadMessages} new)` : ""}
+            </ButtonLink>
+            <ButtonLink href="/company/contact" variant="secondary">
+              Contact form
             </ButtonLink>
             <ButtonLink href="/company/profile">Edit profile</ButtonLink>
           </div>

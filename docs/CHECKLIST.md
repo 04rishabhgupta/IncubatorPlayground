@@ -101,14 +101,18 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 - [x] Notifications for request, acceptance, decline and cancellation (DB trigger)
 - [x] Admin monitoring (`/admin/appointments`) with status counts
 - [x] Tests: time-zone/rules/conflict unit tests, booking DB tests (rules, limits, notifications, privacy), E2E for the full loop
-- [ ] Email copies of appointment notifications (Phase 7, Resend)
+- [x] Email copies of appointment notifications (Phase 7, Resend; sent once `RESEND_API_KEY` is set)
 
 ## Phase 7 — Communication
 
-- [ ] Start-conversation RPC (security definer)
-- [ ] Chat UI: conversation list, history, realtime delivery, timestamps, unread state
-- [ ] Message notifications (de-duplicated)
-- [ ] Email contact form through Resend (server action, rate-limited, logged)
+- [x] Start-conversation RPC (security definer): visitors and company accounts, approved companies, never your own
+- [x] Chat UI: conversation list, history, realtime delivery, timestamps, unread state, "Seen" receipts, load earlier
+- [x] Message notifications (de-duplicated: one unread notification per conversation, with a count)
+- [x] Send limit (20 messages a minute per sender)
+- [x] Email contact form through Resend (server action, signed-in users, rate-limited, logged, in-app copy for the company)
+- [x] Tests: DB (privacy incl. admin, rules, notifications, limits, contact log), unit (email content, validation), E2E (live chat both ways, read receipts, contact form)
+- [x] Follow-up: apply migration `20261023090000` to the hosted project
+- [ ] Follow-up: add `RESEND_API_KEY` and `EMAIL_FROM` (verified domain) to send real email
 
 ## Phase 8 — Testing and deployment
 

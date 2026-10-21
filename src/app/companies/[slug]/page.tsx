@@ -9,6 +9,9 @@ import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { CompanyStatusBadge } from "@/components/ui/status-badge";
+import { ContactForm } from "@/components/company/contact-form";
+import { MessageButton } from "@/components/messages/message-button";
+import { getSession } from "@/lib/auth/session";
 import { getCompanyProfile } from "@/lib/companies/queries";
 import { stageLabel, teamSizeLabel } from "@/lib/companies/startup";
 import { displayUrl } from "@/lib/format";
@@ -30,8 +33,12 @@ export default function CompanyProfilePage({ params }: PageProps<"/companies/[sl
 
 async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "params">) {
   const { slug } = await params;
-  const company = await getCompanyProfile(slug);
+  const [company, session] = await Promise.all([getCompanyProfile(slug), getSession()]);
   if (!company) notFound();
+  // Chat and email are for visitors and other companies, never your own company (or the admin account).
+  const isOwner = session?.userId === company.owner_id;
+  const canReach = company.status === "approved" && !isOwner && session?.profile.role !== "super_admin";
+  const returnTo = `/companies/${company.slug}`;
 
   const location = [company.floor?.name, company.space?.label].filter(Boolean).join(" · ");
 
@@ -63,9 +70,12 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
           </div>
         </div>
         {company.status === "approved" && (
-          <ButtonLink href={`/companies/${company.slug}/book`} className="shrink-0">
-            Request an appointment
-          </ButtonLink>
+          <div className="flex shrink-0 flex-col gap-2 sm:items-stretch">
+            <ButtonLink href={`/companies/${company.slug}/book`}>Request an appointment</ButtonLink>
+            {canReach && (
+              <MessageButton companyId={company.id} companyName={company.name} returnTo={returnTo} />
+            )}
+          </div>
         )}
       </header>
 
@@ -157,62 +167,90 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
           </Card>
         </div>
 
-        <Card className="self-start">
-          <CardHeader title="Contact & location" />
-          <CardBody>
-            <dl className="space-y-3 text-sm">
-              <Detail label="Office">
-                {location || "Not assigned yet"}
-                {company.space && company.status === "approved" && (
-                  <Link
-                    href={`/?company=${company.slug}`}
-                    className="mt-1 block font-medium text-brand-700 hover:underline"
-                  >
-                    View on floor map
-                  </Link>
-                )}
-              </Detail>
-              <Detail label="Email">
-                <a
-                  href={`mailto:${company.business_email}`}
-                  className="break-all text-brand-700 hover:underline"
-                >
-                  {company.business_email}
-                </a>
-              </Detail>
-              {company.phone && (
-                <Detail label="Phone">
-                  <a
-                    href={`tel:${company.phone.replace(/\s/g, "")}`}
-                    className="text-brand-700 hover:underline"
-                  >
-                    {company.phone}
-                  </a>
+        <div className="space-y-6 self-start">
+          <Card>
+            <CardHeader title="Contact & location" />
+            <CardBody>
+              <dl className="space-y-3 text-sm">
+                <Detail label="Office">
+                  {location || "Not assigned yet"}
+                  {company.space && company.status === "approved" && (
+                    <Link
+                      href={`/?company=${company.slug}`}
+                      className="mt-1 block font-medium text-brand-700 hover:underline"
+                    >
+                      View on floor map
+                    </Link>
+                  )}
                 </Detail>
-              )}
-              {company.website && (
-                <Detail label="Website">
+                <Detail label="Email">
                   <a
-                    href={company.website}
-                    target="_blank"
-                    rel="noopener noreferrer nofollow"
+                    href={`mailto:${company.business_email}`}
                     className="break-all text-brand-700 hover:underline"
                   >
-                    {displayUrl(company.website)}
+                    {company.business_email}
                   </a>
                 </Detail>
+                {company.phone && (
+                  <Detail label="Phone">
+                    <a
+                      href={`tel:${company.phone.replace(/\s/g, "")}`}
+                      className="text-brand-700 hover:underline"
+                    >
+                      {company.phone}
+                    </a>
+                  </Detail>
+                )}
+                {company.website && (
+                  <Detail label="Website">
+                    <a
+                      href={company.website}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      className="break-all text-brand-700 hover:underline"
+                    >
+                      {displayUrl(company.website)}
+                    </a>
+                  </Detail>
+                )}
+                {company.stage && <Detail label="Stage">{stageLabel(company.stage)}</Detail>}
+                {company.team_size && <Detail label="Team size">{teamSizeLabel(company.team_size)}</Detail>}
+                {company.founded_year && <Detail label="Founded">{company.founded_year}</Detail>}
+              </dl>
+              {company.availability?.note && (
+                <p className="mt-4 rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted">
+                  {company.availability.note}
+                </p>
               )}
-              {company.stage && <Detail label="Stage">{stageLabel(company.stage)}</Detail>}
-              {company.team_size && <Detail label="Team size">{teamSizeLabel(company.team_size)}</Detail>}
-              {company.founded_year && <Detail label="Founded">{company.founded_year}</Detail>}
-            </dl>
-            {company.availability?.note && (
-              <p className="mt-4 rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted">
-                {company.availability.note}
-              </p>
-            )}
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+
+          {canReach && (
+            <Card>
+              <CardHeader title={`Email ${company.name}`} />
+              <CardBody>
+                {session ? (
+                  <ContactForm
+                    companyId={company.id}
+                    companyName={company.name}
+                    defaultName={session.profile.full_name}
+                    email={session.profile.email}
+                  />
+                ) : (
+                  <p className="text-sm text-muted">
+                    <Link
+                      href={`/login?next=${encodeURIComponent(returnTo)}`}
+                      className="font-medium text-brand-700 hover:underline"
+                    >
+                      Sign in
+                    </Link>{" "}
+                    to email {company.name} or chat with them. Replies come straight to your inbox.
+                  </p>
+                )}
+              </CardBody>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );

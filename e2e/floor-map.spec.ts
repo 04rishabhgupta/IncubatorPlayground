@@ -196,7 +196,7 @@ test("the directory and profiles still work alongside the map", async ({ page })
   await page.goto(`/directory?q=${encodeURIComponent(alpha().name)}`);
   await expect(page.getByText("1 company match your search")).toBeVisible();
   await page.goto(`/companies/${alpha().slug}`);
-  await expect(page.getByRole("heading", { name: alpha().name })).toBeVisible();
+  await expect(page.getByRole("heading", { name: alpha().name, level: 1 })).toBeVisible();
   await expect(page.getByText(`Floor 1 · ${alpha().spaceLabel}`)).toBeVisible();
 
   await page.getByRole("link", { name: "View on floor map" }).click();

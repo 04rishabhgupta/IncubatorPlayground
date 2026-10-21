@@ -469,6 +469,63 @@ export type Database = {
           },
         ];
       };
+      contact_messages: {
+        Row: {
+          id: string;
+          company_id: string;
+          sender_id: string | null;
+          sender_name: string;
+          sender_email: string;
+          subject: string;
+          body: string;
+          status: string;
+          error: string | null;
+          created_at: string;
+          sent_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          company_id: string;
+          sender_id?: string | null;
+          sender_name: string;
+          sender_email: string;
+          subject: string;
+          body: string;
+          status?: string;
+          error?: string | null;
+          created_at?: string;
+          sent_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          company_id?: string;
+          sender_id?: string | null;
+          sender_name?: string;
+          sender_email?: string;
+          subject?: string;
+          body?: string;
+          status?: string;
+          error?: string | null;
+          created_at?: string;
+          sent_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contact_messages_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_messages_sender_id_fkey";
+            columns: ["sender_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       conversation_members: {
         Row: {
           conversation_id: string;
@@ -1076,6 +1133,21 @@ export type Database = {
         };
         Returns: string;
       };
+      my_conversations: {
+        Args: never;
+        Returns: {
+          id: string;
+          company_id: string;
+          company_slug: string;
+          my_role: string;
+          other_name: string;
+          subject: string;
+          last_message_at: string;
+          last_body: string;
+          last_from_me: boolean;
+          unread: number;
+        }[];
+      };
       owns_company: {
         Args: {
           p_company_id: string;
@@ -1101,6 +1173,14 @@ export type Database = {
         };
         Returns: string;
       };
+      set_contact_delivery: {
+        Args: {
+          p_id: string;
+          p_status: string;
+          p_error: string;
+        };
+        Returns: string;
+      };
       shares_context_with: {
         Args: {
           p_profile_id: string;
@@ -1110,6 +1190,13 @@ export type Database = {
       slugify: {
         Args: {
           p_value: string;
+        };
+        Returns: string;
+      };
+      start_conversation: {
+        Args: {
+          p_company_id: string;
+          p_subject: string;
         };
         Returns: string;
       };
@@ -1145,7 +1232,8 @@ export type Database = {
         | "company_suspended"
         | "system"
         | "office_updated"
-        | "office_request_closed";
+        | "office_request_closed"
+        | "contact_message";
       registration_status: "pending" | "approved" | "rejected";
       space_kind: "office" | "meeting_room" | "common_area" | "reception";
       startup_stage: "idea" | "prototype" | "mvp" | "early_revenue" | "growth";

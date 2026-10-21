@@ -115,7 +115,12 @@ Key decisions:
 - **Appointments.** Stored as UTC `starts_at` / `ends_at`, plus the requester's IANA `timezone` for
   display. Duration is 15 min to 4 h. A GiST exclusion constraint prevents overlapping **accepted**
   appointments for the same representative. A trigger enforces the status workflow (below).
-- **Chat.** One conversation per (visitor, company). `conversation_members` holds the participants
+- **Chat.** Opened only through `start_conversation()` (any visitor or company account → an approved
+  company that isn't its own). New messages notify the other member through one merged unread
+  notification per conversation; senders are limited to 20 messages a minute. `my_conversations()`
+  returns the inbox with unread counts under the caller's RLS. The email contact form is logged in
+  `contact_messages` (sender taken from the account; 3 an hour per sender, 20 a day per company).
+  One conversation per (visitor, company). `conversation_members` holds the participants
   and their `last_read_at`, which gives unread counts. It also lets more company users join later
   without schema changes. Message timestamps are set by the server.
 - **Notifications.** Written only by database triggers and server code; users can read them, mark
@@ -148,6 +153,7 @@ Key decisions:
 | Registration requests    | –                       | –                       | submit + read own                            | review              |
 | Profiles                 | –                       | own (+ contacts)        | own + people who contacted it                | read all, set roles |
 | Conversations / messages | –                       | own only                | own company's only                           | **no access**       |
+| Contact form messages    | –                       | send; read own          | send; read own + received                    | read                |
 | Appointments             | –                       | own; cancel             | own company's; accept/reject/complete/cancel | read, manage        |
 | Notifications            | –                       | own                     | own                                          | own                 |
 | FITT team, announcements | read (public / running) | read (public / running) | read (public / running)                      | full                |
