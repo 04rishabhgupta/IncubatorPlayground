@@ -153,16 +153,13 @@ export async function changeAnnouncement(_prev: FormState, formData: FormData): 
   if (!parsed.success) return { status: "error", message: "Unknown announcement." };
   const { announcementId, intent } = parsed.data;
 
+  // Ending keeps it in the history. Only one that has started can end now (the
+  // end must stay after the start), so a scheduled one is deleted instead.
+  const now = new Date().toISOString();
   const query =
     intent === "delete"
       ? supabase.from("announcements").delete().eq("id", announcementId)
-      : // Ending keeps it in the history. Only a running one can end now (the end
-        // must stay after the start), so a scheduled one is deleted instead.
-        supabase
-          .from("announcements")
-          .update({ ends_at: new Date().toISOString() })
-          .eq("id", announcementId)
-          .lte("starts_at", new Date(Date.now() - 1000).toISOString());
+      : supabase.from("announcements").update({ ends_at: now }).eq("id", announcementId).lt("starts_at", now);
   const { data, error } = await query.select("title").maybeSingle();
   if (error || !data) {
     return {

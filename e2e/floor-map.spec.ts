@@ -40,6 +40,7 @@ test("renders the floor with placed companies, vacant offices and shared rooms",
 
 test("clicking an office shows its company and updates the URL", async ({ page }) => {
   await openMap(page);
+  const fit = await viewBox(page);
   await office(page, alpha().spaceCode).click();
   await expect(page).toHaveURL(`/?company=${alpha().slug}`);
   await expect(office(page, alpha().spaceCode)).toHaveAttribute("aria-pressed", "true");
@@ -54,8 +55,8 @@ test("clicking an office shows its company and updates the URL", async ({ page }
     `/companies/${alpha().slug}`,
   );
 
-  // The map zoomed in towards the selection.
-  expect((await viewBox(page)).width).toBeLessThan(1200);
+  // The map zoomed in towards the selection (after a short animation).
+  await expect.poll(async () => (await viewBox(page)).width).toBeLessThan(fit.width * 0.9);
 
   // Back button clears the selection without a page reload.
   await page.goBack();

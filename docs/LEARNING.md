@@ -385,6 +385,26 @@ team" on the label.
 **6. Status chips.** The room label shows availability as a tinted pill with a dot _and_ a word, so it
 never relies on colour alone.
 
+### Phase 4R.7: what the full regression run caught
+
+Running the whole browser suite against the real app found things unit tests couldn't:
+
+- **Duplicate ids.** The company dashboard had two fields with `id="note"` (availability and the
+  office request). A `<label for="note">` points at the _first_ one, so clicking "Note for the admin"
+  focused the wrong box, and a screen reader announced the wrong field. The fix is unique ids; the E2E
+  test now asserts the dashboard has no duplicate ids at all.
+- **Off-by-a-second rules.** "End now" required an announcement to have started at least a second ago,
+  so ending one right after posting failed. Compare against the exact timestamp being written instead of
+  adding margins.
+- **Tests that age.** Two older tests checked a fixed viewBox width and the 4R.1 sample's door count;
+  the page layout and the sample had legitimately changed. Assert _relationships_ ("narrower than the
+  whole-floor view") and derive expected numbers from the source (`floor1Geometry.doors.length`).
+- **Races in tests.** Navigating straight after clicking "Sign in" can beat the redirect; wait for the
+  URL first. And Playwright dismisses `confirm()` dialogs unless the test accepts them.
+- **Cleaning up shared data.** E2E runs against a real project, so every record a test creates carries
+  the run id and is deleted afterwards (`afterAll` or global teardown). After the run, a script checked
+  that nothing was left behind.
+
 ### Phase 4R.6: the layout editor and occupancy
 
 **1. One document, one transaction.** The editor edits a floor as a single JSON value. The database

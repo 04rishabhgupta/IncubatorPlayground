@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { floor1Geometry } from "../src/lib/floor/layouts/floor-1";
 import { adminClient, login, PASSWORD, readAccounts } from "./support";
 
 /**
@@ -143,9 +144,10 @@ test("admins can open the renderer preview; visitors cannot", async ({ page }) =
   await expect(page.getByText("Sample data only")).toBeVisible();
   const map = page.getByRole("group", { name: "Sample floor floor plan" });
   await expect(map).toHaveCSS("opacity", "1");
-  expect(await map.locator("use[data-fixture]").count()).toBeGreaterThan(40);
-  expect(await map.locator("[data-door]").count()).toBe(6);
-  expect(await map.locator("[data-window]").count()).toBe(8);
+  // The preview draws the real Floor 1 plan with sample companies.
+  expect(await map.locator("[data-fixture]").count()).toBe(floor1Geometry.fixtures.length);
+  expect(await map.locator("[data-door]").count()).toBe(floor1Geometry.doors.length);
+  expect(await map.locator("[data-window]").count()).toBe(floor1Geometry.windows.length);
   // Rooms stay interactive above the furniture.
   await map.locator('[data-space-code="101"]').click();
   await expect(map.locator('[data-space-code="101"]')).toHaveAttribute("aria-pressed", "true");

@@ -45,6 +45,7 @@ export function OfficeRequestForm({
 
       <form action={action} className="space-y-3" noValidate>
         <SelectField
+          id="office-request-space"
           name="spaceId"
           label={request ? "Change your request" : "Preferred office"}
           options={[
@@ -55,6 +56,7 @@ export function OfficeRequestForm({
           errors={state.fieldErrors?.spaceId}
         />
         <TextareaField
+          id="office-request-note"
           name="note"
           label="Note for the admin"
           optional
