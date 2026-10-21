@@ -31,6 +31,15 @@ export default async function AdminFloorPage({ searchParams }: PageProps<"/admin
         description="Place approved companies in vacant offices. Companies are notified whenever their office changes."
         action={
           <div className="flex flex-wrap gap-2">
+            <ButtonLink
+              href={`/admin/floor/editor${result.status === "ok" ? `?floor=${result.data.plan.floor.slug}` : ""}`}
+              variant="secondary"
+            >
+              Edit layout
+            </ButtonLink>
+            <ButtonLink href="/admin/occupancy" variant="ghost">
+              Occupancy
+            </ButtonLink>
             <ButtonLink href="/admin/floor/preview" variant="ghost">
               Renderer preview
             </ButtonLink>

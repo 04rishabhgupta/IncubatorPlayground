@@ -385,6 +385,36 @@ team" on the label.
 **6. Status chips.** The room label shows availability as a tinted pill with a dot _and_ a word, so it
 never relies on colour alone.
 
+### Phase 4R.6: the layout editor and occupancy
+
+**1. One document, one transaction.** The editor edits a floor as a single JSON value. The database
+function `save_floor_layout()` applies it: layout, space shapes (matched by code, so ids and placements
+stay) and a history row, all or nothing. Doing that from the app as three separate requests could leave
+the floor half-saved.
+
+**2. Optimistic concurrency.** The editor remembers the layout's `updated_at` when it opened. The save
+passes it back; if the row has changed since, the function refuses (`40001`) instead of silently
+overwriting someone else's work. After a successful save the page takes the new stamp.
+
+**3. Append-only history.** `floor_layout_versions` has select and insert policies but no update or
+delete grant, so not even the admin can rewrite it. Restoring means loading an old version into the editor
+and saving it, which is itself a new version. The first save also stores the layout as it was, so the
+original is never lost.
+
+**4. The same validation twice.** [layout-document.ts](../src/lib/floor/layout-document.ts) runs in the
+browser (live preview, 250 ms after typing stops) and again in the Server Action, because the browser's
+answer can't be trusted. Errors block saving; warnings (overlapping rooms, doors off any wall, duplicate
+seat numbers, things off the floor) only advise.
+
+**5. Pointing at JSON errors.** Browsers no longer say _where_ `JSON.parse` failed, so
+`jsonErrorOffset()` re-scans the text with a tiny recursive-descent parser that follows the JSON grammar
+and returns the offset of the first bad character; the editor turns that into "line 3, column 13" and can
+put the cursor there.
+
+**6. Occupancy** ([occupancy.ts](../src/lib/floor/occupancy.ts)) is a pure function over offices,
+companies and requests: occupied/vacant, rate, desks versus people (stated team size, else listed members)
+and requests per office. Pure functions like this are trivial to unit test.
+
 ### Phase 4R.5: startups, the FITT team, announcements and office requests
 
 **1. An enum for a fixed list.** Startup stages are a Postgres `enum` (`startup_stage`), so the
@@ -653,19 +683,20 @@ Not every clash is forbidden:
 
 ## 9. What each phase added
 
-| Phase                 | Concepts introduced                                                                                                        | Key files                                                                                                                                                                                  |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1 Foundation          | Migrations, RLS, grants, guard triggers, PGlite tests, validated env                                                       | `supabase/migrations/2026101210*`, `tests/db/harness.ts`, `src/lib/env*.ts`                                                                                                                |
-| 2 Auth                | Supabase Auth with cookies, Data Access Layer, Server Actions, signup trigger, Playwright                                  | `src/lib/auth/*`, `src/proxy.ts`, `src/app/(auth)/*`                                                                                                                                       |
-| 3 Directory           | Review workflow via triggers, notifications, Storage uploads, URL-synced filters                                           | `src/lib/companies/*`, `src/lib/admin/actions.ts`, `20261014090000_company_review.sql`                                                                                                     |
-| 4 Floor map           | SVG `viewBox` zoom/pan, pure viewport maths, History API selection, data-driven geometry                                   | `src/lib/floor/*`, `src/components/floor/*`, `src/components/admin/floor-placement.tsx`                                                                                                    |
-| 5 Availability        | Upserts, "no row = Unknown", Realtime + `router.refresh`, public vs owner views                                            | `src/lib/availability/*`, `src/components/availability/*`, `src/components/realtime/live-refresh.tsx`                                                                                      |
-| 6 Appointments        | UTC vs wall time, DST, half-open ranges, exclusion constraint, state machine, privacy-preserving RPC, Post/Redirect/Get    | `src/lib/appointments/*`, `src/components/appointments/*`, migrations `20261016090000` and `20261016100000`                                                                                |
-| 4R.1 Floor renderer   | Backward-compatible schema defaults, size-aware SVG drawing, layering, `React.memo`, SVG arcs and masks, screen-pixel text | `src/lib/floor/geometry.ts`, `src/lib/floor/drawing.ts`, `src/lib/floor/labels.ts`, `src/components/floor/floor-symbols.tsx`, `src/components/floor/floor-map.tsx`, `/admin/floor/preview` |
-| 4R.3 Exploring        | Directional focus navigation, accent-insensitive multi-word search with match reasons, URL state for areas                 | `src/lib/floor/navigation.ts`, `src/lib/floor/search.ts`, `src/components/floor/explorer-panel.tsx`, `src/components/floor/floor-explorer.tsx`                                             |
-| 4R.2 Floor 1 plan     | In-place data migrations, guarded updates, migration-vs-seed order, upgrade-path DB tests, team seating                    | `src/lib/floor/layouts/floor-1.ts`, `src/lib/floor/seats.ts`, `20261017090000_floor1_architectural_plan.sql`, `tests/db/floor-layout.test.ts`                                              |
-| 4R.5 Startups & FITT  | Enums, time-limited rows via RLS, one-row-per-owner upserts, trigger-driven fulfilment, zone-aware admin times             | `src/lib/companies/startup.ts`, `src/lib/companies/office-request*.ts`, `src/lib/admin/incubator-actions.ts`, `20261021090000_startup_profile_staff_announcements.sql`                     |
-| 4R.4 Floor & building | Multi-floor tabs, building overview panel, floor tagline/description metadata, admin floor switcher and settings modal     | `src/components/floor/building-panel.tsx`, `src/components/floor/floor-explorer.tsx`, `src/components/admin/floor-settings.tsx`, `20261019120000_floor_metadata.sql`                       |
+| Phase                 | Concepts introduced                                                                                                         | Key files                                                                                                                                                                                  |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 Foundation          | Migrations, RLS, grants, guard triggers, PGlite tests, validated env                                                        | `supabase/migrations/2026101210*`, `tests/db/harness.ts`, `src/lib/env*.ts`                                                                                                                |
+| 2 Auth                | Supabase Auth with cookies, Data Access Layer, Server Actions, signup trigger, Playwright                                   | `src/lib/auth/*`, `src/proxy.ts`, `src/app/(auth)/*`                                                                                                                                       |
+| 3 Directory           | Review workflow via triggers, notifications, Storage uploads, URL-synced filters                                            | `src/lib/companies/*`, `src/lib/admin/actions.ts`, `20261014090000_company_review.sql`                                                                                                     |
+| 4 Floor map           | SVG `viewBox` zoom/pan, pure viewport maths, History API selection, data-driven geometry                                    | `src/lib/floor/*`, `src/components/floor/*`, `src/components/admin/floor-placement.tsx`                                                                                                    |
+| 5 Availability        | Upserts, "no row = Unknown", Realtime + `router.refresh`, public vs owner views                                             | `src/lib/availability/*`, `src/components/availability/*`, `src/components/realtime/live-refresh.tsx`                                                                                      |
+| 6 Appointments        | UTC vs wall time, DST, half-open ranges, exclusion constraint, state machine, privacy-preserving RPC, Post/Redirect/Get     | `src/lib/appointments/*`, `src/components/appointments/*`, migrations `20261016090000` and `20261016100000`                                                                                |
+| 4R.1 Floor renderer   | Backward-compatible schema defaults, size-aware SVG drawing, layering, `React.memo`, SVG arcs and masks, screen-pixel text  | `src/lib/floor/geometry.ts`, `src/lib/floor/drawing.ts`, `src/lib/floor/labels.ts`, `src/components/floor/floor-symbols.tsx`, `src/components/floor/floor-map.tsx`, `/admin/floor/preview` |
+| 4R.3 Exploring        | Directional focus navigation, accent-insensitive multi-word search with match reasons, URL state for areas                  | `src/lib/floor/navigation.ts`, `src/lib/floor/search.ts`, `src/components/floor/explorer-panel.tsx`, `src/components/floor/floor-explorer.tsx`                                             |
+| 4R.2 Floor 1 plan     | In-place data migrations, guarded updates, migration-vs-seed order, upgrade-path DB tests, team seating                     | `src/lib/floor/layouts/floor-1.ts`, `src/lib/floor/seats.ts`, `20261017090000_floor1_architectural_plan.sql`, `tests/db/floor-layout.test.ts`                                              |
+| 4R.6 Layout editor    | Single-transaction RPCs, optimistic concurrency, append-only history, shared client/server validation, a JSON error locator | `src/lib/floor/layout-document.ts`, `src/components/admin/layout-editor.tsx`, `src/lib/admin/layout-actions.ts`, `20261022090000_floor_layout_history.sql`, `/admin/occupancy`             |
+| 4R.5 Startups & FITT  | Enums, time-limited rows via RLS, one-row-per-owner upserts, trigger-driven fulfilment, zone-aware admin times              | `src/lib/companies/startup.ts`, `src/lib/companies/office-request*.ts`, `src/lib/admin/incubator-actions.ts`, `20261021090000_startup_profile_staff_announcements.sql`                     |
+| 4R.4 Floor & building | Multi-floor tabs, building overview panel, floor tagline/description metadata, admin floor switcher and settings modal      | `src/components/floor/building-panel.tsx`, `src/components/floor/floor-explorer.tsx`, `src/components/admin/floor-settings.tsx`, `20261019120000_floor_metadata.sql`                       |
 
 **Phase 7 preview:** sending email from the server (Resend), rate limiting, and real-time chat with read receipts.
 

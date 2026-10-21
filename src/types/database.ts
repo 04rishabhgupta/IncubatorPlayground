@@ -553,6 +553,48 @@ export type Database = {
           },
         ];
       };
+      floor_layout_versions: {
+        Row: {
+          id: string;
+          floor_id: string;
+          document: Json;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          floor_id: string;
+          document: Json;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          floor_id?: string;
+          document?: Json;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "floor_layout_versions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "floor_layout_versions_floor_id_fkey";
+            columns: ["floor_id"];
+            isOneToOne: false;
+            referencedRelation: "floors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       floor_layouts: {
         Row: {
           id: string;
@@ -984,6 +1026,12 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Enums"]["app_role"];
       };
+      floor_layout_document: {
+        Args: {
+          p_floor_id: string;
+        };
+        Returns: Json;
+      };
       get_busy_times: {
         Args: {
           p_member_id: string;
@@ -1042,6 +1090,15 @@ export type Database = {
       };
       resubmit_company_registration: {
         Args: never;
+        Returns: string;
+      };
+      save_floor_layout: {
+        Args: {
+          p_floor_id: string;
+          p_document: Json;
+          p_note: string;
+          p_expected_updated_at: string;
+        };
         Returns: string;
       };
       shares_context_with: {

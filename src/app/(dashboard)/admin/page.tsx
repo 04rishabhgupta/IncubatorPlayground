@@ -71,6 +71,9 @@ export default async function AdminPage() {
             <ButtonLink href="/admin/floor" variant="secondary">
               Floor layout
             </ButtonLink>
+            <ButtonLink href="/admin/occupancy" variant="secondary">
+              Occupancy
+            </ButtonLink>
             <ButtonLink href="/admin/appointments" variant="secondary">
               Appointments
             </ButtonLink>

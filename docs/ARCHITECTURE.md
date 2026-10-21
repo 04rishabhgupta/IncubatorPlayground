@@ -96,6 +96,7 @@ erDiagram
   buildings ||--o{ incubator_staff : "FITT team"
   floors |o--o{ announcements : "shown on (none = every floor)"
   companies ||--o| office_requests : "asks for"
+  floors ||--o{ floor_layout_versions : "saved layouts"
   floor_spaces |o--o{ office_requests : "preferred office (optional)"
 ```
 
@@ -248,7 +249,12 @@ page.tsx (server) ── getFloorPlan(?floor) ──► floors, layout, spaces, 
    floor, update `floor_spaces` rows **in place** (matched by code), never delete and re-insert them:
    `companies.space_id` is `on delete set null`.
 
-   Preview any change at `/admin/floor/preview` (sample data) before writing it to the database.
+   Edit an existing floor at **`/admin/floor/editor`**: the whole floor as one JSON document
+   (`width`, `height`, `geometry`, and `spaces` = each space's shape by code), with a live preview,
+   errors that block saving and warnings that don't. Saving calls `save_floor_layout()`, which applies
+   the document in one transaction, updates space shapes in place (ids are kept), refuses a save made
+   from an outdated copy, and appends the version to `floor_layout_versions` (append-only; any version
+   can be loaded back into the editor). Spaces can be reshaped there, not added or removed.
 
 3. Insert one `floor_spaces` row per clickable space: `code`, `kind` (`office`, `meeting_room`,
    `common_area`, `reception`), `label`, optional `capacity`, and `shape`. A shape is

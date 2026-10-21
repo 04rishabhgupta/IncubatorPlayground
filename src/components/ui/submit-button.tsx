@@ -13,6 +13,7 @@ export function SubmitButton({
   size,
   name,
   value,
+  disabled = false,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
@@ -21,6 +22,8 @@ export function SubmitButton({
   size?: ComponentProps<typeof Button>["size"];
   name?: string;
   value?: string;
+  /** Disabled even when not pending (e.g. nothing to save). */
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -30,8 +33,8 @@ export function SubmitButton({
       size={size}
       name={name}
       value={value}
-      disabled={pending}
-      aria-disabled={pending}
+      disabled={pending || disabled}
+      aria-disabled={pending || disabled}
       className={className}
     >
       {pending ? (pendingLabel ?? "Please wait…") : children}
