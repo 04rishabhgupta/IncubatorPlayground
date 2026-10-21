@@ -9,7 +9,7 @@ import { Alert } from "@/components/ui/alert";
 import { InputField, SelectField } from "@/components/ui/field";
 import { CompanyStatusBadge } from "@/components/ui/status-badge";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { updatePlacement, updateSpaceDetails } from "@/lib/admin/floor-actions";
+import { closeOfficeRequest, updatePlacement, updateSpaceDetails } from "@/lib/admin/floor-actions";
 import { cn } from "@/lib/cn";
 import type { AdminFloorData, PlacedCompany } from "@/lib/floor/admin-queries";
 import type { MapSpace } from "@/lib/floor/queries";
@@ -220,17 +220,11 @@ export function FloorPlacement({ data }: { data: AdminFloorData }) {
                 Click an office on the map to assign, move or remove a company, or to rename the space.
               </p>
               {unplaced.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-ink">Waiting for an office</h3>
-                  <ul className="mt-2 space-y-1 text-sm text-muted">
-                    {unplaced.map((c) => (
-                      <li key={c.id}>
-                        {c.name}
-                        {c.industry ? ` · ${c.industry.name}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <WaitingList
+                  unplaced={unplaced}
+                  spaceLabel={(id) => plan.spaces.find((s) => s.id === id)?.label}
+                  onShowSpace={setSelectedId}
+                />
               )}
             </>
           ) : (
@@ -292,6 +286,11 @@ function AssignForm({
   state,
   action,
 }: PlacementFormProps & { spaceId: string; unplaced: AdminFloorData["unplaced"] }) {
+  // Whoever asked for this very office comes first, then "any office", then the rest.
+  const rank = (c: AdminFloorData["unplaced"][number]) =>
+    c.request?.space_id === spaceId ? 0 : c.request && !c.request.space_id ? 1 : 2;
+  const ranked = [...unplaced].sort((a, b) => rank(a) - rank(b));
+  const wanted = ranked.find((c) => rank(c) === 0);
   return (
     <form action={action} className="space-y-3" noValidate>
       <input type="hidden" name="panelSpaceId" value={spaceId} />
@@ -306,9 +305,23 @@ function AssignForm({
             name="companyId"
             label="Assign company"
             placeholder="Choose an approved company"
-            options={unplaced.map((c) => ({ value: c.id, label: c.name }))}
+            options={ranked.map((c) => ({
+              value: c.id,
+              label:
+                c.request?.space_id === spaceId
+                  ? `${c.name} — requested this office`
+                  : c.request
+                    ? `${c.name} — requested ${c.request.space_id ? "another office" : "any office"}`
+                    : c.name,
+            }))}
+            defaultValue={wanted?.id ?? ""}
             errors={state.fieldErrors?.companyId}
           />
+          {wanted?.request?.note && (
+            <p className="text-xs text-muted">
+              {wanted.name}: “{wanted.request.note}”
+            </p>
+          )}
           <SubmitButton pendingLabel="Assigning…">Assign to this office</SubmitButton>
         </>
       )}
@@ -395,5 +408,74 @@ function SpaceDetailsForm({ space }: { space: MapSpace }) {
         Save details
       </SubmitButton>
     </form>
+  );
+}
+
+/** Approved companies without an office; those that sent a request show it, with a way to close it. */
+function WaitingList({
+  unplaced,
+  spaceLabel,
+  onShowSpace,
+}: {
+  unplaced: AdminFloorData["unplaced"];
+  spaceLabel: (spaceId: string) => string | undefined;
+  onShowSpace: (spaceId: string) => void;
+}) {
+  const [state, action] = useActionState(closeOfficeRequest, initialFormState);
+  const requests = unplaced.filter((c) => c.request).length;
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium text-ink">
+        Waiting for an office
+        {requests > 0 && (
+          <span className="ml-2 rounded-full bg-accent-400/20 px-2 py-0.5 text-xs text-accent-600">
+            {requests} {requests === 1 ? "request" : "requests"}
+          </span>
+        )}
+      </h3>
+      <Message state={state} />
+      <ul className="space-y-2 text-sm">
+        {unplaced.map((c) => {
+          const wanted = c.request?.space_id ? spaceLabel(c.request.space_id) : undefined;
+          return (
+            <li key={c.id} className="space-y-1">
+              <p className="text-ink">
+                {c.name}
+                {c.industry && <span className="text-muted"> · {c.industry.name}</span>}
+              </p>
+              {c.request && (
+                <div className="space-y-1 rounded-lg bg-surface-muted px-2.5 py-2 text-xs text-muted">
+                  <p>
+                    Requested{" "}
+                    {c.request.space_id ? (
+                      wanted ? (
+                        <button
+                          type="button"
+                          onClick={() => onShowSpace(c.request!.space_id!)}
+                          className="font-medium text-brand-700 hover:underline"
+                        >
+                          {wanted}
+                        </button>
+                      ) : (
+                        "an office on another floor"
+                      )
+                    ) : (
+                      "any office"
+                    )}
+                  </p>
+                  {c.request.note && <p className="text-ink">“{c.request.note}”</p>}
+                  <form action={action}>
+                    <input type="hidden" name="companyId" value={c.id} />
+                    <SubmitButton variant="ghost" size="sm" pendingLabel="Closing…">
+                      Close request
+                    </SubmitButton>
+                  </form>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

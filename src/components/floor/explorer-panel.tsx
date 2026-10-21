@@ -7,7 +7,9 @@ import { CompanyLogo } from "@/components/company/company-logo";
 import { cn } from "@/lib/cn";
 import { displayUrl } from "@/lib/format";
 import type { FloorArea } from "@/lib/floor/geometry";
-import type { MapCompany, MapSpace } from "@/lib/floor/queries";
+import { STARTUP_STAGES, stageLabel, teamSizeLabel } from "@/lib/companies/startup";
+import type { IncubatorStaff, MapCompany, MapSpace } from "@/lib/floor/queries";
+import { FittTeamList } from "./fitt-team";
 import { areaKindName } from "@/lib/floor/search";
 
 type Industry = { slug: string; name: string };
@@ -35,8 +37,11 @@ type PanelProps = {
   industries: Industry[];
   query: string;
   industry: string;
+  stage: string;
+  staff: IncubatorStaff[];
   onQueryChange: (value: string) => void;
   onIndustryChange: (value: string) => void;
+  onStageChange: (value: string) => void;
   onSelectCompany: (company: MapCompany) => void;
   onHoverCompany: (company: MapCompany | null) => void;
   onSelectPlace: (place: PlaceResult) => void;
@@ -90,14 +95,16 @@ function CompanyList({
   industries,
   query,
   industry,
+  stage,
   onQueryChange,
   onIndustryChange,
+  onStageChange,
   onSelectCompany,
   onHoverCompany,
   onSelectPlace,
   onHoverPlace,
 }: PanelProps) {
-  const filtering = Boolean(query.trim() || industry);
+  const filtering = Boolean(query.trim() || industry || stage);
   const placeCount = places.length === 1 ? "1 place" : `${places.length} places`;
   return (
     <>
@@ -133,6 +140,22 @@ function CompanyList({
           {industries.map((i) => (
             <option key={i.slug} value={i.slug}>
               {i.name}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="map-stage" className="sr-only">
+          Filter by stage
+        </label>
+        <select
+          id="map-stage"
+          value={stage}
+          onChange={(e) => onStageChange(e.target.value)}
+          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        >
+          <option value="">All stages</option>
+          {STARTUP_STAGES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </select>
@@ -253,7 +276,7 @@ function CompanyCard({
           )}
         </span>
         <span className="block truncate text-xs text-muted">
-          {[company.industry?.name, company.tagline].filter(Boolean).join(" · ")}
+          {[company.industry?.name, stageLabel(company.stage), company.tagline].filter(Boolean).join(" · ")}
         </span>
         <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
           <AvailabilityBadge availability={company.availability} />
@@ -278,6 +301,7 @@ const kindLabel: Record<MapSpace["kind"], string> = {
 
 function Details({
   selection,
+  staff,
   onClose,
   headingRef,
 }: PanelProps & {
@@ -337,10 +361,10 @@ function Details({
         </p>
         {space.kind === "office" && (
           <p className="rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted">
-            This office is currently vacant. Companies interested in space on the floor can contact the
-            platform admin.
+            This office is currently vacant. Approved companies can request it from their dashboard.
           </p>
         )}
+        {space.kind === "reception" && <FittTeamList staff={staff} headingId="panel-fitt" />}
       </div>
     );
   }
@@ -379,6 +403,8 @@ function Details({
             {company.tagline ?? company.description}
           </p>
         )}
+
+        <StartupFacts company={company} />
 
         <section aria-labelledby="panel-team">
           <h3 id="panel-team" className="text-sm font-semibold text-ink">
@@ -457,5 +483,37 @@ function Details({
         </Link>
       </div>
     </div>
+  );
+}
+
+/** Stage, team size and tech stack, when the company has filled them in. */
+function StartupFacts({ company }: { company: MapCompany }) {
+  const facts = [
+    ["Stage", stageLabel(company.stage)],
+    ["Team size", teamSizeLabel(company.team_size)],
+  ].filter((f): f is [string, string] => Boolean(f[1]));
+  if (!facts.length && !company.tech_stack.length) return null;
+  return (
+    <section aria-label="Startup profile" className="space-y-2">
+      {facts.length > 0 && (
+        <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          {facts.map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs text-muted">{label}</dt>
+              <dd className="text-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {company.tech_stack.length > 0 && (
+        <ul aria-label="Tech stack" className="flex flex-wrap gap-1.5">
+          {company.tech_stack.map((t) => (
+            <li key={t} className="rounded-md bg-surface-muted px-2 py-0.5 font-mono text-[11px] text-ink">
+              {t}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

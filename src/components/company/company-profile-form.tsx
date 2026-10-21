@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/alert";
 import { InputField, SelectField, TextareaField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { updateCompanyProfile } from "@/lib/companies/actions";
+import { STARTUP_STAGES } from "@/lib/companies/startup";
 import { initialFormState } from "@/lib/forms";
 
 export type CompanyProfileDefaults = {
@@ -18,6 +19,9 @@ export type CompanyProfileDefaults = {
   phone: string;
   officeDetails: string;
   foundedYear: string;
+  stage: string;
+  teamSize: string;
+  techStack: string;
 };
 
 export function CompanyProfileForm({
@@ -35,9 +39,11 @@ export function CompanyProfileForm({
   // and bring the first error into view.
   const formRef = useRef<HTMLFormElement>(null);
   const industryRef = useRef<HTMLSelectElement>(null);
+  const stageRef = useRef<HTMLSelectElement>(null);
   useEffect(() => {
     if (industryRef.current && state.values?.industry !== undefined)
       industryRef.current.value = state.values.industry;
+    if (stageRef.current && state.values?.stage !== undefined) stageRef.current.value = state.values.stage;
     if (state.status !== "idle") {
       const target =
         formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]') ??
@@ -86,6 +92,37 @@ export function CompanyProfileForm({
         hint="One per line, up to 30."
         defaultValue={v.services}
         errors={e?.services}
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SelectField
+          ref={stageRef}
+          name="stage"
+          label="Stage"
+          optional
+          placeholder="Not specified"
+          options={STARTUP_STAGES}
+          defaultValue={v.stage}
+          errors={e?.stage}
+        />
+        <InputField
+          name="teamSize"
+          label="Team size"
+          optional
+          inputMode="numeric"
+          maxLength={6}
+          hint="Everyone working on the startup, not only those listed in your team."
+          defaultValue={v.teamSize}
+          errors={e?.teamSize}
+        />
+      </div>
+      <TextareaField
+        name="techStack"
+        label="Tech stack"
+        optional
+        rows={2}
+        hint="Technologies you build with, separated by commas (up to 20), e.g. Python, ROS, React."
+        defaultValue={v.techStack}
+        errors={e?.techStack}
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <InputField

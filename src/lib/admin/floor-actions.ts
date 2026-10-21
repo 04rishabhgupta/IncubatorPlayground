@@ -141,6 +141,27 @@ export async function updateSpaceDetails(_prev: FormState, formData: FormData): 
   return { status: "success", message: "Space details saved." };
 }
 
+/** Close a company's office request without placing it; a trigger tells the company. */
+export async function closeOfficeRequest(_prev: FormState, formData: FormData): Promise<FormState> {
+  if (!(await requireAdmin()))
+    return { status: "error", message: "Only the platform admin can close office requests." };
+  const companyId = z.uuid().safeParse(formData.get("companyId"));
+  if (!companyId.success) return { status: "error", message: "Unknown company." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("office_requests")
+    .delete()
+    .eq("company_id", companyId.data)
+    .select("company_id")
+    .maybeSingle();
+  if (error || !data)
+    return { status: "error", message: "The request couldn't be closed. It may already be closed." };
+  revalidateFloor();
+  revalidatePath("/admin");
+  return { status: "success", message: "Request closed. The company has been notified." };
+}
+
 const floorDetailsSchema = z.object({
   floorId: z.string().uuid("Invalid floor id."),
   name: z.string().trim().min(1, "Enter a floor name.").max(60, "Keep the name under 60 characters."),

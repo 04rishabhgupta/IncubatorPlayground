@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { DirectoryCompany } from "@/lib/companies/queries";
+import { stageLabel } from "@/lib/companies/startup";
 import { AvailabilityBadge } from "./availability-badge";
 import { CompanyLogo } from "./company-logo";
 
@@ -15,7 +16,11 @@ export function CompanyCard({ company }: { company: DirectoryCompany }) {
           <CompanyLogo name={company.name} path={company.logo_path} />
           <div className="min-w-0">
             <h2 className="truncate font-semibold text-ink group-hover:text-brand-700">{company.name}</h2>
-            <p className="text-sm text-muted">{company.industry?.name ?? "Industry not set"}</p>
+            <p className="text-sm text-muted">
+              {[company.industry?.name ?? "Industry not set", stageLabel(company.stage)]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
           </div>
         </div>
         {summary && <p className="line-clamp-2 text-sm text-muted">{summary}</p>}

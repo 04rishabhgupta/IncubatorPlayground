@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { STARTUP_STAGES } from "@/lib/companies/startup";
 
 const currentYear = new Date().getFullYear();
 
@@ -7,25 +8,43 @@ const blankToUndefined = (value: string) => (value === "" ? undefined : value);
 const optionalText = (max: number) =>
   z.string().trim().max(max, `Keep this under ${max} characters.`).transform(blankToUndefined).optional();
 
-/** One service per line (or comma separated); trimmed, de-duplicated. */
-export const servicesSchema = z
-  .string()
-  .max(4000)
-  .transform((value) =>
-    Array.from(
-      new Set(
-        value
-          .split(/[\n,]/)
-          .map((s) => s.trim())
-          .filter(Boolean),
+/** A list typed one per line (or comma separated); trimmed, de-duplicated. */
+const labelListSchema = (noun: string, maxItems: number, maxLength: number) =>
+  z
+    .string()
+    .max(4000)
+    .transform((value) =>
+      Array.from(
+        new Set(
+          value
+            .split(/[\n,]/)
+            .map((s) => s.trim())
+            .filter(Boolean),
+        ),
       ),
-    ),
-  )
-  .pipe(
-    z
-      .array(z.string().max(80, "Keep each service under 80 characters."))
-      .max(30, "List at most 30 services."),
-  );
+    )
+    .pipe(
+      z
+        .array(z.string().max(maxLength, `Keep each ${noun} under ${maxLength} characters.`))
+        .max(maxItems, `List at most ${maxItems} ${noun === "technology" ? "technologies" : `${noun}s`}.`),
+    );
+
+export const servicesSchema = labelListSchema("service", 30, 80);
+export const techStackSchema = labelListSchema("technology", 20, 40);
+
+export const stageSchema = z
+  .union([z.enum(STARTUP_STAGES.map((s) => s.value) as [string, ...string[]]), z.literal("")])
+  .optional()
+  .transform((value) => (value ? (value as (typeof STARTUP_STAGES)[number]["value"]) : undefined));
+
+export const teamSizeSchema = z
+  .string()
+  .trim()
+  .transform(blankToUndefined)
+  .optional()
+  .refine((value) => value === undefined || (/^\d{1,6}$/.test(value) && +value >= 1 && +value <= 100000), {
+    message: "Enter the number of people, e.g. 8.",
+  });
 
 export const websiteSchema = z
   .string()
@@ -67,6 +86,9 @@ export const companyProfileSchema = z.object({
   phone: phoneSchema,
   officeDetails: optionalText(500),
   foundedYear: foundedYearSchema,
+  stage: stageSchema,
+  teamSize: teamSizeSchema,
+  techStack: techStackSchema.optional().default([]),
 });
 
 export const reviewDecisionSchema = z

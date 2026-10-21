@@ -1,5 +1,5 @@
 import "server-only";
-import type { AvailabilityStatus } from "@/lib/companies/queries";
+import type { AvailabilityStatus, StartupStage } from "@/lib/companies/queries";
 import { createClient } from "@/lib/supabase/server";
 import type { Enums } from "@/types/database";
 import { floorGeometrySchema, shapeSchema, type FloorGeometry, type Shape } from "./geometry";
@@ -39,6 +39,9 @@ export type MapCompany = {
   phone: string | null;
   website: string | null;
   space_id: string | null;
+  stage: StartupStage | null;
+  team_size: number | null;
+  tech_stack: string[];
   industry: { slug: string; name: string } | null;
   availability: { status: AvailabilityStatus; note: string | null; updated_at: string } | null;
   team: Array<{
@@ -58,13 +61,35 @@ export type FloorPlan = {
   spaces: MapSpace[];
   companies: MapCompany[];
   industries: Array<{ slug: string; name: string }>;
+  /** The FITT Incubation Team (public members), shown at reception. */
+  staff: IncubatorStaff[];
+  /** Announcements running now, for this floor or every floor. */
+  announcements: Announcement[];
+};
+
+export type IncubatorStaff = {
+  id: string;
+  full_name: string;
+  job_title: string | null;
+  email: string | null;
+  phone: string | null;
+  availability: { status: AvailabilityStatus; updated_at: string } | null;
+};
+
+export type Announcement = {
+  id: string;
+  floor_id: string | null;
+  title: string;
+  body: string | null;
+  starts_at: string;
+  ends_at: string | null;
 };
 
 export type FloorPlanResult =
   { status: "ok"; plan: FloorPlan } | { status: "no-floor" } | { status: "invalid"; problems: string[] };
 
 const companyColumns =
-  "id, slug, name, tagline, description, logo_path, business_email, phone, website, space_id, " +
+  "id, slug, name, tagline, description, logo_path, business_email, phone, website, space_id, stage, team_size, tech_stack, " +
   "industry:industries(slug, name), " +
   "availability:company_availability(status, note, updated_at), " +
   "team:company_team_members(id, full_name, job_title, sort_order, availability:member_availability(status, updated_at))";
@@ -83,7 +108,9 @@ export async function getFloorPlan(
 
   let floorsQuery = supabase
     .from("floors")
-    .select("id, slug, name, level, tagline, description, building:buildings(name, timezone, address)")
+    .select(
+      "id, slug, name, level, tagline, description, building_id, building:buildings(name, timezone, address)",
+    )
     .order("level");
   if (!includeInactive) floorsQuery = floorsQuery.eq("is_active", true);
   const { data: floors, error: floorsError } = await floorsQuery;
@@ -92,7 +119,10 @@ export async function getFloorPlan(
 
   const floor = floors.find((f) => f.slug === floorSlug) ?? floors[0];
 
-  const [layoutRes, spacesRes, companiesRes, industriesRes] = await Promise.all([
+  // Announcements are filtered by time here as well as by RLS, because RLS
+  // also lets an admin read scheduled and finished ones.
+  const now = new Date().toISOString();
+  const [layoutRes, spacesRes, companiesRes, industriesRes, staffRes, announcementsRes] = await Promise.all([
     supabase.from("floor_layouts").select("width, height, geometry").eq("floor_id", floor.id).maybeSingle(),
     supabase
       .from("floor_spaces")
@@ -109,8 +139,21 @@ export async function getFloorPlan(
       .order("sort_order", { referencedTable: "team" })
       .overrideTypes<MapCompany[], { merge: false }>(),
     supabase.from("industries").select("slug, name").order("name"),
+    supabase
+      .from("incubator_staff")
+      .select("id, full_name, job_title, email, phone, availability, availability_updated_at")
+      .eq("building_id", floor.building_id)
+      .eq("is_public", true)
+      .order("sort_order")
+      .order("full_name"),
+    supabase
+      .from("announcements")
+      .select("id, floor_id, title, body, starts_at, ends_at")
+      .lte("starts_at", now)
+      .or(`ends_at.is.null,ends_at.gt.${now}`)
+      .order("starts_at", { ascending: false }),
   ]);
-  for (const res of [layoutRes, spacesRes, companiesRes, industriesRes]) {
+  for (const res of [layoutRes, spacesRes, companiesRes, industriesRes, staffRes, announcementsRes]) {
     if (res.error) throw res.error;
   }
   if (!layoutRes.data) return { status: "invalid", problems: [`${floor.name} has no layout.`] };
@@ -151,6 +194,17 @@ export async function getFloorPlan(
       spaces,
       companies: companiesRes.data ?? [],
       industries: industriesRes.data ?? [],
+      staff: (staffRes.data ?? []).map(({ availability, availability_updated_at, ...member }) => ({
+        ...member,
+        availability:
+          availability && availability_updated_at
+            ? { status: availability, updated_at: availability_updated_at }
+            : null,
+      })),
+      // Only announcements for floors that are on show (or for every floor).
+      announcements: (announcementsRes.data ?? []).filter(
+        (a) => a.floor_id === null || floors.some((f) => f.id === a.floor_id),
+      ),
     },
   };
 }

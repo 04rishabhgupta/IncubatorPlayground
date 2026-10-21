@@ -93,6 +93,10 @@ erDiagram
   profiles ||--o{ appointments : requests
   company_team_members |o--o{ appointments : "representative (optional)"
   profiles ||--o{ notifications : receives
+  buildings ||--o{ incubator_staff : "FITT team"
+  floors |o--o{ announcements : "shown on (none = every floor)"
+  companies ||--o| office_requests : "asks for"
+  floor_spaces |o--o{ office_requests : "preferred office (optional)"
 ```
 
 Key decisions:
@@ -115,6 +119,16 @@ Key decisions:
   without schema changes. Message timestamps are set by the server.
 - **Notifications.** Written only by database triggers and server code; users can read them, mark
   them read, and delete them.
+- **Startup profile (4R.5).** `companies.stage` (`idea` → `growth`), `team_size` and `tech_stack`
+  (≤ 20 labels of ≤ 40 characters) are edited by the owner like the rest of the profile.
+- **FITT Incubation Team.** `incubator_staff` are the incubator's own people, not company team members:
+  admin-managed, shown at Reception and in the building overview. `is_public = false` hides one.
+- **Announcements.** Admin-only. `floor_id` null means every floor. Visitors only ever read the ones
+  running now (`starts_at ≤ now < ends_at`, or no end); the admin sees scheduled and finished ones too.
+- **Office requests.** One row per company (`company_id` is the key): a preferred office or any, plus
+  a note. A trigger only accepts approved companies without an office and only `office` spaces.
+  Placing the company deletes its request; an admin closing it notifies the company
+  (`office_request_closed`).
 
 ## Roles and permissions
 
@@ -125,17 +139,19 @@ Key decisions:
 | `company`     | Signup with `account_type: "company"` metadata                |
 | `super_admin` | Manually, via SQL or service role. Never via signup metadata. |
 
-| Resource                 | Guest           | Visitor          | Company account                              | Super admin         |
-| ------------------------ | --------------- | ---------------- | -------------------------------------------- | ------------------- |
-| Floors, layouts, spaces  | read            | read             | read                                         | full                |
-| Companies                | read approved   | read approved    | read approved + own; edit own*               | full                |
-| Team / availability      | read (approved) | read (approved)  | manage own                                   | full                |
-| Registration requests    | –               | –                | submit + read own                            | review              |
-| Profiles                 | –               | own (+ contacts) | own + people who contacted it                | read all, set roles |
-| Conversations / messages | –               | own only         | own company's only                           | **no access**       |
-| Appointments             | –               | own; cancel      | own company's; accept/reject/complete/cancel | read, manage        |
-| Notifications            | –               | own              | own                                          | own                 |
-| Storage (logos, avatars) | public URLs     | public URLs      | write `<company_id>/…` folder                | full                |
+| Resource                 | Guest                   | Visitor                 | Company account                              | Super admin         |
+| ------------------------ | ----------------------- | ----------------------- | -------------------------------------------- | ------------------- |
+| Floors, layouts, spaces  | read                    | read                    | read                                         | full                |
+| Companies                | read approved           | read approved           | read approved + own; edit own*               | full                |
+| Team / availability      | read (approved)         | read (approved)         | manage own                                   | full                |
+| Registration requests    | –                       | –                       | submit + read own                            | review              |
+| Profiles                 | –                       | own (+ contacts)        | own + people who contacted it                | read all, set roles |
+| Conversations / messages | –                       | own only                | own company's only                           | **no access**       |
+| Appointments             | –                       | own; cancel             | own company's; accept/reject/complete/cancel | read, manage        |
+| Notifications            | –                       | own                     | own                                          | own                 |
+| FITT team, announcements | read (public / running) | read (public / running) | read (public / running)                      | full                |
+| Office requests          | –                       | –                       | own: send, change, withdraw                  | read, close         |
+| Storage (logos, avatars) | public URLs             | public URLs             | write `<company_id>/…` folder                | full                |
 
 \* Owners cannot change `status`, `slug`, `owner_id`, `floor_id` or `space_id`. Those are reserved
 for super admins, and a guard trigger enforces it. New companies are always created as `pending`.

@@ -70,7 +70,8 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 - [ ] 4R.2 follow-up: replace placeholder measurements with the building's real plan (waiting for drawings)
 - [x] 4R.3 Clickable areas, keyboard room navigation, wider search, richer list cards
 - [x] 4R.4 Floor tabs + building panel, floor tagline/description, admin floor management
-- [ ] 4R.5 Startup stage / team size / tech stack, FITT Incubation Team, announcements, requested office
+- [x] 4R.5 Startup stage / team size / tech stack, FITT Incubation Team, announcements, requested office
+- [ ] 4R.5 follow-up: apply migration `20261021090000` to the hosted project; add the real FITT team in `/admin/fitt-team`
 - [ ] 4R.6 Admin layout JSON editor with live preview, validation and history; occupancy overview
 - [ ] 4R.7 Full regression, docs
 

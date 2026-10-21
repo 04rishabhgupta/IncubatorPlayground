@@ -1,4 +1,5 @@
 import type { FloorArea } from "./geometry";
+import { stageLabel } from "@/lib/companies/startup";
 import type { MapCompany, MapSpace } from "./queries";
 
 /**
@@ -47,6 +48,8 @@ export function matchCompany(
     { text: company.industry?.name ?? "" },
     { text: space ? `${space.code} ${space.label}` : "" },
     { text: company.tagline ?? "" }, // already on the card, so no reason needed
+    { text: stageLabel(company.stage) ?? "" },
+    ...company.tech_stack.map((t) => ({ text: t, reason: `Tech: ${t}` })),
     ...company.team.flatMap((m) => [
       { text: m.full_name, reason: `Team: ${m.full_name}` },
       { text: m.job_title ?? "", reason: m.job_title ? `Team: ${m.full_name}, ${m.job_title}` : undefined },

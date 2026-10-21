@@ -36,6 +36,9 @@ export async function updateCompanyProfile(_prev: FormState, formData: FormData)
       phone: input.phone ?? null,
       office_details: input.officeDetails ?? null,
       founded_year: input.foundedYear ? Number(input.foundedYear) : null,
+      stage: input.stage ?? null,
+      team_size: input.teamSize ? Number(input.teamSize) : null,
+      tech_stack: input.techStack,
     })
     .eq("id", company.id);
   if (error) {

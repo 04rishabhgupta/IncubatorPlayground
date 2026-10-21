@@ -385,7 +385,24 @@ team" on the label.
 **6. Status chips.** The room label shows availability as a tinted pill with a dot _and_ a word, so it
 never relies on colour alone.
 
-### Phase 4R.3: exploring the floor
+### Phase 4R.5: startups, the FITT team, announcements and office requests
+
+**1. An enum for a fixed list.** Startup stages are a Postgres `enum` (`startup_stage`), so the
+database rejects anything else, and [startup.ts](../src/lib/companies/startup.ts) keeps the labels in one
+place for forms, cards, the stage filter and search.
+
+**2. Time-limited rows with RLS.** An announcement's visibility is part of its _read policy_:
+`starts_at <= now() and (ends_at is null or ends_at > now())`. Nothing has to "expire" it. The query on
+the map filters by time as well, because the same policy lets an admin see scheduled and finished ones.
+
+**3. One row per company.** `office_requests` uses `company_id` as its primary key, so a company can't
+file two requests; the form does an _upsert_. Two triggers close the loop: placing the company deletes
+its request, and an admin deleting it (without placing) sends `office_request_closed`. A company
+withdrawing its own request sends nothing.
+
+**4. Times typed in the building's zone.** The admin's "Starts/Ends" are `datetime-local` values with no
+zone. The action reads the building's `timezone` and converts with `wallTimeToUtc` (the same helper as
+appointments), so "6:30 pm" means 6:30 pm at the incubator wherever the admin is.
 
 **1. Clickable areas.** Labelled zones people go to (lounge, pantry; not corridors, see
 `isSelectableArea`) get a button in the map's top layer, like rooms. Selecting one sets `?area=<key>` and
@@ -647,6 +664,7 @@ Not every clash is forbidden:
 | 4R.1 Floor renderer   | Backward-compatible schema defaults, size-aware SVG drawing, layering, `React.memo`, SVG arcs and masks, screen-pixel text | `src/lib/floor/geometry.ts`, `src/lib/floor/drawing.ts`, `src/lib/floor/labels.ts`, `src/components/floor/floor-symbols.tsx`, `src/components/floor/floor-map.tsx`, `/admin/floor/preview` |
 | 4R.3 Exploring        | Directional focus navigation, accent-insensitive multi-word search with match reasons, URL state for areas                 | `src/lib/floor/navigation.ts`, `src/lib/floor/search.ts`, `src/components/floor/explorer-panel.tsx`, `src/components/floor/floor-explorer.tsx`                                             |
 | 4R.2 Floor 1 plan     | In-place data migrations, guarded updates, migration-vs-seed order, upgrade-path DB tests, team seating                    | `src/lib/floor/layouts/floor-1.ts`, `src/lib/floor/seats.ts`, `20261017090000_floor1_architectural_plan.sql`, `tests/db/floor-layout.test.ts`                                              |
+| 4R.5 Startups & FITT  | Enums, time-limited rows via RLS, one-row-per-owner upserts, trigger-driven fulfilment, zone-aware admin times             | `src/lib/companies/startup.ts`, `src/lib/companies/office-request*.ts`, `src/lib/admin/incubator-actions.ts`, `20261021090000_startup_profile_staff_announcements.sql`                     |
 | 4R.4 Floor & building | Multi-floor tabs, building overview panel, floor tagline/description metadata, admin floor switcher and settings modal     | `src/components/floor/building-panel.tsx`, `src/components/floor/floor-explorer.tsx`, `src/components/admin/floor-settings.tsx`, `20261019120000_floor_metadata.sql`                       |
 
 **Phase 7 preview:** sending email from the server (Resend), rate limiting, and real-time chat with read receipts.

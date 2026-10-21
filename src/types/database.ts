@@ -10,6 +10,57 @@ export type Database = {
   };
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          id: string;
+          floor_id: string | null;
+          title: string;
+          body: string | null;
+          starts_at: string;
+          ends_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          floor_id?: string | null;
+          title: string;
+          body?: string | null;
+          starts_at?: string;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          floor_id?: string | null;
+          title?: string;
+          body?: string | null;
+          starts_at?: string;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "announcements_floor_id_fkey";
+            columns: ["floor_id"];
+            isOneToOne: false;
+            referencedRelation: "floors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       appointments: {
         Row: {
           id: string;
@@ -169,6 +220,9 @@ export type Database = {
           space_id: string | null;
           created_at: string;
           updated_at: string;
+          stage: Database["public"]["Enums"]["startup_stage"] | null;
+          team_size: number | null;
+          tech_stack: string[];
         };
         Insert: {
           id?: string;
@@ -193,6 +247,9 @@ export type Database = {
           space_id?: string | null;
           created_at?: string;
           updated_at?: string;
+          stage?: Database["public"]["Enums"]["startup_stage"] | null;
+          team_size?: number | null;
+          tech_stack?: string[];
         };
         Update: {
           id?: string;
@@ -217,6 +274,9 @@ export type Database = {
           space_id?: string | null;
           created_at?: string;
           updated_at?: string;
+          stage?: Database["public"]["Enums"]["startup_stage"] | null;
+          team_size?: number | null;
+          tech_stack?: string[];
         };
         Relationships: [
           {
@@ -635,6 +695,59 @@ export type Database = {
           },
         ];
       };
+      incubator_staff: {
+        Row: {
+          id: string;
+          building_id: string;
+          full_name: string;
+          job_title: string | null;
+          email: string | null;
+          phone: string | null;
+          availability: Database["public"]["Enums"]["availability_status"] | null;
+          availability_updated_at: string | null;
+          is_public: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          building_id: string;
+          full_name: string;
+          job_title?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          availability?: Database["public"]["Enums"]["availability_status"] | null;
+          availability_updated_at?: string | null;
+          is_public?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          building_id?: string;
+          full_name?: string;
+          job_title?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          availability?: Database["public"]["Enums"]["availability_status"] | null;
+          availability_updated_at?: string | null;
+          is_public?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "incubator_staff_building_id_fkey";
+            columns: ["building_id"];
+            isOneToOne: false;
+            referencedRelation: "buildings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       industries: {
         Row: {
           id: string;
@@ -778,6 +891,45 @@ export type Database = {
           },
         ];
       };
+      office_requests: {
+        Row: {
+          company_id: string;
+          space_id: string | null;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          company_id: string;
+          space_id?: string | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          company_id?: string;
+          space_id?: string | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "office_requests_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: true;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "office_requests_space_id_fkey";
+            columns: ["space_id"];
+            isOneToOne: false;
+            referencedRelation: "floor_spaces";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           id: string;
@@ -904,6 +1056,13 @@ export type Database = {
         };
         Returns: string;
       };
+      valid_labels: {
+        Args: {
+          p_items: string[];
+          p_max: number;
+        };
+        Returns: boolean;
+      };
       valid_services: {
         Args: {
           p_services: string[];
@@ -928,9 +1087,11 @@ export type Database = {
         | "company_rejected"
         | "company_suspended"
         | "system"
-        | "office_updated";
+        | "office_updated"
+        | "office_request_closed";
       registration_status: "pending" | "approved" | "rejected";
       space_kind: "office" | "meeting_room" | "common_area" | "reception";
+      startup_stage: "idea" | "prototype" | "mvp" | "early_revenue" | "growth";
     };
     CompositeTypes: {
       [_ in never]: never;

@@ -29,6 +29,7 @@ export default async function AdminPage() {
     visitors,
     companyAccounts,
     appointments,
+    officeRequests,
     pendingList,
   ] = await Promise.all([
     count(companies()),
@@ -39,6 +40,7 @@ export default async function AdminPage() {
     count(profiles().eq("role", "visitor")),
     count(profiles().eq("role", "company")),
     count(supabase.from("appointments").select("id", { count: "exact", head: true })),
+    count(supabase.from("office_requests").select("company_id", { count: "exact", head: true })),
     supabase
       .from("companies")
       .select("id, name, business_email, created_at, industry:industries(name)")
@@ -56,6 +58,7 @@ export default async function AdminPage() {
     ["Registered visitors", visitors],
     ["Company accounts", companyAccounts],
     ["Appointments", appointments],
+    ["Open office requests", officeRequests],
   ];
 
   return (
@@ -70,6 +73,12 @@ export default async function AdminPage() {
             </ButtonLink>
             <ButtonLink href="/admin/appointments" variant="secondary">
               Appointments
+            </ButtonLink>
+            <ButtonLink href="/admin/announcements" variant="secondary">
+              Announcements
+            </ButtonLink>
+            <ButtonLink href="/admin/fitt-team" variant="secondary">
+              FITT team
             </ButtonLink>
             <ButtonLink href="/admin/companies">Manage companies</ButtonLink>
           </div>

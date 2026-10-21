@@ -8,6 +8,7 @@ import { shapeBounds, type Bounds, type FloorArea } from "@/lib/floor/geometry";
 import { arrowDirections, nearestInDirection } from "@/lib/floor/navigation";
 import type { FloorPlan, MapCompany, MapSpace } from "@/lib/floor/queries";
 import { matchArea, matchCompany, matchSpace } from "@/lib/floor/search";
+import { AnnouncementList } from "./announcements";
 import { BuildingPanel } from "./building-panel";
 import { ExplorerPanel, type CompanyResult, type PanelSelection, type PlaceResult } from "./explorer-panel";
 import { FloorMap, areaAccessibleName, isSelectableArea, navId, spaceAccessibleName } from "./floor-map";
@@ -155,21 +156,23 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
   const [hoveredAreaKey, setHoveredAreaKey] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [industry, setIndustry] = useState("");
+  const [stage, setStage] = useState("");
 
   const visibleCompanies = useMemo<CompanyResult[]>(
     () =>
       sortedCompanies.flatMap((company) => {
         if (industry && company.industry?.slug !== industry) return [];
+        if (stage && company.stage !== stage) return [];
         const space = company.space_id ? spacesById.get(company.space_id) : undefined;
         const hit = matchCompany(company, space, query);
         return hit ? [{ company, reason: hit.reason }] : [];
       }),
-    [sortedCompanies, spacesById, query, industry],
+    [sortedCompanies, spacesById, query, industry, stage],
   );
 
   // Shared places are listed (and searchable) unless an industry filter narrows the list to companies.
   const visiblePlaces = useMemo<PlaceResult[]>(() => {
-    if (industry) return [];
+    if (industry || stage) return [];
     const spaces = sharedSpaces.flatMap((space): PlaceResult[] => {
       const hit = matchSpace(space, query);
       return hit ? [{ type: "space", space, reason: hit.reason }] : [];
@@ -179,13 +182,13 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
       return hit ? [{ type: "area", area, reason: hit.reason }] : [];
     });
     return [...spaces, ...zones];
-  }, [sharedSpaces, areas, query, industry]);
+  }, [sharedSpaces, areas, query, industry, stage]);
 
   const dimmedSpaceIds = useMemo(() => {
-    if (!query.trim() && !industry) return undefined;
+    if (!query.trim() && !industry && !stage) return undefined;
     const visible = new Set(visibleCompanies.map((r) => r.company.space_id));
     return new Set(plan.spaces.filter((s) => s.kind === "office" && !visible.has(s.id)).map((s) => s.id));
-  }, [query, industry, visibleCompanies, plan.spaces]);
+  }, [query, industry, stage, visibleCompanies, plan.spaces]);
 
   const hovered = hoveredSpaceId ? spacesById.get(hoveredSpaceId) : undefined;
   const hoveredArea = hoveredAreaKey ? areas.find((a) => a.key === hoveredAreaKey) : undefined;
@@ -313,6 +316,13 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
           )}
         </div>
 
+        <AnnouncementList
+          className="space-y-2"
+          announcements={plan.announcements.filter(
+            (a) => a.floor_id === null || a.floor_id === plan.floor.id,
+          )}
+        />
+
         <div
           ref={containerRef}
           onKeyDown={handleMapKeyDown}
@@ -386,6 +396,9 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
         industry={industry}
         onQueryChange={setQuery}
         onIndustryChange={setIndustry}
+        stage={stage}
+        onStageChange={setStage}
+        staff={plan.staff}
         onSelectCompany={selectCompany}
         onHoverCompany={(company) => setHoveredSpaceId(company?.space_id ?? null)}
         onSelectPlace={selectPlace}
@@ -400,6 +413,8 @@ export function FloorExplorer({ plan }: { plan: FloorPlan }) {
         building={plan.building}
         floors={plan.floors}
         currentFloorSlug={plan.floor.slug}
+        staff={plan.staff}
+        announcements={plan.announcements}
         isOpen={isBuildingPanelOpen}
         onClose={() => setIsBuildingPanelOpen(false)}
       />

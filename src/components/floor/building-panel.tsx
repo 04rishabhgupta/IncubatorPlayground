@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { ButtonLink } from "@/components/ui/button";
-import type { FloorPlan, FloorSummary } from "@/lib/floor/queries";
+import type { Announcement, FloorPlan, FloorSummary, IncubatorStaff } from "@/lib/floor/queries";
+import { AnnouncementList } from "./announcements";
+import { FittTeamList } from "./fitt-team";
 
 export type BuildingPanelProps = {
   building: FloorPlan["building"];
   floors: FloorSummary[];
   currentFloorSlug: string;
+  staff?: IncubatorStaff[];
+  announcements?: Announcement[];
   isOpen: boolean;
   onClose: () => void;
 };
@@ -17,7 +21,15 @@ export type BuildingPanelProps = {
  * Building Overview modal panel: displays building details, address,
  * timezone, active floors, taglines, and navigation across the incubator.
  */
-export function BuildingPanel({ building, floors, currentFloorSlug, isOpen, onClose }: BuildingPanelProps) {
+export function BuildingPanel({
+  building,
+  floors,
+  currentFloorSlug,
+  staff = [],
+  announcements = [],
+  isOpen,
+  onClose,
+}: BuildingPanelProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape key
@@ -162,6 +174,24 @@ export function BuildingPanel({ building, floors, currentFloorSlug, isOpen, onCl
               })}
             </div>
           </section>
+
+          {announcements.length > 0 && (
+            <section aria-labelledby="building-announcements-heading" className="space-y-2">
+              <h3
+                id="building-announcements-heading"
+                className="text-sm font-semibold uppercase tracking-wider text-muted"
+              >
+                Announcements
+              </h3>
+              <AnnouncementList
+                className="space-y-2"
+                announcements={announcements}
+                floorNames={new Map(floors.map((f) => [f.id, f.name]))}
+              />
+            </section>
+          )}
+
+          <FittTeamList staff={staff} headingId="building-fitt-heading" />
 
           {/* Quick info & Directory Link */}
           <div className="rounded-xl border border-dashed border-border bg-surface-muted/50 p-4">

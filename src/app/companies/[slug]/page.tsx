@@ -10,6 +10,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { CompanyStatusBadge } from "@/components/ui/status-badge";
 import { getCompanyProfile } from "@/lib/companies/queries";
+import { stageLabel, teamSizeLabel } from "@/lib/companies/startup";
 import { displayUrl } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Company profile" };
@@ -78,6 +79,24 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
               </p>
             </CardBody>
           </Card>
+
+          {company.tech_stack.length > 0 && (
+            <Card>
+              <CardHeader title="Tech stack" />
+              <CardBody>
+                <ul className="flex flex-wrap gap-2">
+                  {company.tech_stack.map((tech) => (
+                    <li
+                      key={tech}
+                      className="rounded-lg border border-border bg-surface-muted px-3 py-1 font-mono text-xs text-ink"
+                    >
+                      {tech}
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+          )}
 
           {company.services.length > 0 && (
             <Card>
@@ -183,6 +202,8 @@ async function CompanyProfile({ params }: Pick<PageProps<"/companies/[slug]">, "
                   </a>
                 </Detail>
               )}
+              {company.stage && <Detail label="Stage">{stageLabel(company.stage)}</Detail>}
+              {company.team_size && <Detail label="Team size">{teamSizeLabel(company.team_size)}</Detail>}
               {company.founded_year && <Detail label="Founded">{company.founded_year}</Detail>}
             </dl>
             {company.availability?.note && (

@@ -9,7 +9,14 @@ import { getFloorPlan, type FloorPlan, type MapCompany } from "./queries";
  * the approved companies that don't have an office yet. Admin-only via RLS.
  */
 export type PlacedCompany = MapCompany & { status: CompanyStatus };
-export type UnplacedCompany = { id: string; name: string; industry: { name: string } | null };
+export type OfficeRequest = { space_id: string | null; note: string | null; created_at: string };
+export type UnplacedCompany = {
+  id: string;
+  name: string;
+  industry: { name: string } | null;
+  /** The company's office request, if it sent one. */
+  request: OfficeRequest | null;
+};
 
 export type AdminFloorSummary = {
   id: string;
@@ -34,7 +41,7 @@ export async function getAdminFloorData(floorSlug?: string) {
   const { plan } = result;
 
   const supabase = await createClient();
-  const [placedRes, unplacedRes, allFloorsRes] = await Promise.all([
+  const [placedRes, unplacedRes, allFloorsRes, requestsRes] = await Promise.all([
     supabase
       .from("companies")
       .select(
@@ -50,17 +57,27 @@ export async function getAdminFloorData(floorSlug?: string) {
       .eq("status", "approved")
       .is("space_id", null)
       .order("name")
-      .overrideTypes<UnplacedCompany[], { merge: false }>(),
+      .overrideTypes<Array<Omit<UnplacedCompany, "request">>, { merge: false }>(),
     supabase.from("floors").select("id, slug, name, level, is_active, tagline, description").order("level"),
+    supabase.from("office_requests").select("company_id, space_id, note, created_at").order("created_at"),
   ]);
   if (placedRes.error) throw placedRes.error;
   if (unplacedRes.error) throw unplacedRes.error;
   if (allFloorsRes.error) throw allFloorsRes.error;
+  if (requestsRes.error) throw requestsRes.error;
+  const requests = new Map((requestsRes.data ?? []).map(({ company_id, ...r }) => [company_id, r]));
 
   const data: AdminFloorData = {
     plan,
     placed: (placedRes.data ?? []).map((c) => ({ ...c, team: [] })),
-    unplaced: unplacedRes.data ?? [],
+    // Companies that asked for an office first, oldest request first.
+    unplaced: (unplacedRes.data ?? [])
+      .map((c) => ({ ...c, request: requests.get(c.id) ?? null }))
+      .sort((a, b) =>
+        a.request && b.request
+          ? a.request.created_at.localeCompare(b.request.created_at)
+          : Number(Boolean(b.request)) - Number(Boolean(a.request)),
+      ),
     allFloors: allFloorsRes.data ?? [],
   };
   return { status: "ok" as const, data };

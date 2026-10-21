@@ -8,10 +8,11 @@ import type { Enums } from "@/types/database";
  */
 
 export type CompanyStatus = Enums<"company_status">;
+export type StartupStage = Enums<"startup_stage">;
 export type AvailabilityStatus = Enums<"availability_status">;
 
 const directoryColumns =
-  "id, name, slug, tagline, description, logo_path, " +
+  "id, name, slug, tagline, description, logo_path, stage, " +
   "industry:industries(slug, name), " +
   "space:floor_spaces(code, label), " +
   "availability:company_availability(status, updated_at)";
@@ -53,6 +54,7 @@ export type DirectoryCompany = {
   id: string;
   name: string;
   slug: string;
+  stage: StartupStage | null;
   tagline: string | null;
   description: string | null;
   logo_path: string | null;
@@ -68,6 +70,7 @@ export async function getCompanyProfile(slug: string) {
     .from("companies")
     .select(
       "id, owner_id, name, slug, tagline, description, services, website, business_email, phone, founded_year, logo_path, status, " +
+        "stage, team_size, tech_stack, " +
         "industry:industries(slug, name), " +
         "floor:floors(name, level), space:floor_spaces(code, label), " +
         "availability:company_availability(status, note, updated_at), " +
@@ -97,6 +100,9 @@ export type CompanyProfile = {
   founded_year: number | null;
   logo_path: string | null;
   status: CompanyStatus;
+  stage: StartupStage | null;
+  team_size: number | null;
+  tech_stack: string[];
   industry: { slug: string; name: string } | null;
   floor: { name: string; level: number } | null;
   space: { code: string; label: string } | null;
@@ -119,6 +125,7 @@ export async function getOwnCompany(ownerId: string) {
     .from("companies")
     .select(
       "id, name, slug, tagline, description, services, website, business_email, phone, office_details, founded_year, logo_path, status, status_reason, created_at, industry_id, " +
+        "stage, team_size, tech_stack, " +
         "industry:industries(slug, name), space:floor_spaces(label)",
     )
     .eq("owner_id", ownerId)
@@ -145,6 +152,9 @@ export type OwnCompany = {
   status_reason: string | null;
   created_at: string;
   industry_id: string | null;
+  stage: StartupStage | null;
+  team_size: number | null;
+  tech_stack: string[];
   industry: { slug: string; name: string } | null;
   space: { label: string } | null;
 };

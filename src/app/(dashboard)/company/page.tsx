@@ -3,6 +3,7 @@ import { unstable_rethrow } from "next/navigation";
 import { CompanyAvailabilityForm } from "@/components/availability/availability-form";
 import { AvailabilityBadge } from "@/components/company/availability-badge";
 import { CompanyLogo } from "@/components/company/company-logo";
+import { OfficeRequestForm } from "@/components/company/office-request-form";
 import { ResubmitButton } from "@/components/company/resubmit-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
@@ -12,7 +13,9 @@ import { CompanyStatusBadge } from "@/components/ui/status-badge";
 import { requireRole } from "@/lib/auth/session";
 import { countPendingRequests } from "@/lib/appointments/queries";
 import { getCompanyAvailability, getOwnTeam } from "@/lib/availability/queries";
+import { getOwnOfficeRequest, listRequestableOffices } from "@/lib/companies/office-request";
 import { getOwnCompany } from "@/lib/companies/queries";
+import { stageLabel, teamSizeLabel } from "@/lib/companies/startup";
 import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Company dashboard" };
@@ -46,13 +49,18 @@ export default async function CompanyDashboardPage() {
   let company, availability;
   let pendingRequests = 0;
   let team: Awaited<ReturnType<typeof getOwnTeam>> = [];
+  let officeRequest: Awaited<ReturnType<typeof getOwnOfficeRequest>> = null;
+  let offices: Awaited<ReturnType<typeof listRequestableOffices>> = [];
   try {
     company = await getOwnCompany(userId);
     if (company) {
-      [availability, team, pendingRequests] = await Promise.all([
+      const needsOffice = company.status === "approved" && !company.space;
+      [availability, team, pendingRequests, officeRequest, offices] = await Promise.all([
         getCompanyAvailability(company.id),
         getOwnTeam(company.id),
         countPendingRequests(company.id),
+        needsOffice ? getOwnOfficeRequest(company.id) : null,
+        needsOffice ? listRequestableOffices() : [],
       ]);
     }
   } catch (error) {
@@ -82,6 +90,9 @@ export default async function CompanyDashboardPage() {
     ["Phone", company.phone],
     ["Website", company.website],
     ["Founded", company.founded_year ? String(company.founded_year) : null],
+    ["Stage", stageLabel(company.stage)],
+    ["Team size", teamSizeLabel(company.team_size)],
+    ["Tech stack", company.tech_stack.length ? company.tech_stack.join(", ") : null],
     [
       "Office",
       company.space?.label ?? (company.office_details ? `Requested: ${company.office_details}` : null),
@@ -161,6 +172,18 @@ export default async function CompanyDashboardPage() {
             </CardBody>
           </Card>
         </div>
+
+        {company.status === "approved" && !company.space && (
+          <Card>
+            <CardHeader
+              title="Request an office"
+              description="Your company doesn't have an office on the floor map yet. Tell the platform admin which one you'd like."
+            />
+            <CardBody>
+              <OfficeRequestForm request={officeRequest} offices={offices} />
+            </CardBody>
+          </Card>
+        )}
 
         <Card>
           <CardHeader title="Company profile" action={<CompanyStatusBadge status={company.status} />} />
