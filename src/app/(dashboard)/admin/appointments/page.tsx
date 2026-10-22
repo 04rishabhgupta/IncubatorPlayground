@@ -4,7 +4,6 @@ import { AppointmentCard } from "@/components/appointments/appointment-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
-import { Card, CardBody } from "@/components/ui/card";
 import { listAppointmentsForAdmin } from "@/lib/appointments/queries";
 import { requireRole } from "@/lib/auth/session";
 
@@ -43,12 +42,10 @@ export default async function AdminAppointmentsPage() {
       />
       <dl className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
         {stats.map(([label, value]) => (
-          <Card key={label}>
-            <CardBody>
-              <dt className="text-sm text-muted">{label}</dt>
-              <dd className="mt-1 text-2xl font-semibold text-ink">{value}</dd>
-            </CardBody>
-          </Card>
+          <div key={label} className="rounded-xl border border-border bg-surface px-5 py-4">
+            <dt className="text-sm text-muted">{label}</dt>
+            <dd className="mt-1 text-2xl font-semibold text-ink">{value}</dd>
+          </div>
         ))}
       </dl>
       <h2 className="mb-3 text-lg font-semibold text-ink">Latest 100 requests</h2>

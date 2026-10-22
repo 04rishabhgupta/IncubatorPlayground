@@ -116,8 +116,12 @@ Legend: `[x]` done and verified · `[ ]` not started · `[~]` partially done
 
 ## Phase 8 — Testing and deployment
 
-- [ ] Admin user management: list/search users, change roles
-- [ ] End-to-end tests of the main workflows
-- [ ] RLS tests against a real Supabase instance
-- [ ] Responsive / accessibility pass
-- [ ] Vercel + Supabase production configuration, auth redirect URLs, SMTP
+- [x] Admin user management (`/admin/users`): list/search/filter users; visitor ↔ super admin only, enforced in the database (company owners stay companies, never your own role, never the last admin); the user is notified
+- [x] End-to-end tests of the main workflows (98 Playwright tests, desktop and phone)
+- [x] RLS tests against the real Supabase project (`e2e/rls.spec.ts`): guest, visitor, company and admin through the real Data API
+- [x] Responsive / accessibility pass: axe-core WCAG 2.1 A/AA checks and no sideways scrolling on 27 pages; fixed definition lists, badge contrast, accessible names on badges, inbox rows and map rooms
+- [x] Security headers; deployment guide (`docs/DEPLOYMENT.md`)
+- [x] Migration `20261024090000` applied to the hosted project
+- [ ] Vercel project and production deploy (needs `npx vercel login` by the owner)
+- [ ] Supabase production settings: Site URL / redirect URLs for the production domain, SMTP, email templates
+- [ ] Optional: a Content-Security-Policy; a separate Supabase project for E2E tests once production has real users

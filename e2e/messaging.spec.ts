@@ -63,8 +63,11 @@ test("a visitor and a company chat live, with unread counts and read receipts", 
   // The company sees one unread conversation from the visitor, and one merged notification.
   const company = await signedIn(browser, alpha().email, "/company");
   await company.goto("/messages");
-  const row = company.getByRole("link", { name: `${name}, 1 unread` });
-  await expect(row).toBeVisible();
+  const row = company
+    .getByRole("list", { name: "Conversations" })
+    .getByRole("link")
+    .filter({ hasText: name });
+  await expect(row).toContainText("1 unread");
   const { data: notes } = await adminClient()
     .from("notifications")
     .select("title")

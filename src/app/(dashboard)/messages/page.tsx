@@ -50,9 +50,11 @@ export default async function MessagesPage() {
               <Link
                 href={`/messages/${c.id}`}
                 className="flex items-start gap-3 px-4 py-3 hover:bg-surface-muted"
-                aria-label={`${c.other_name}${c.unread ? `, ${c.unread} unread` : ""}`}
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
+                <span
+                  aria-hidden="true"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800"
+                >
                   {c.other_name.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -74,8 +76,9 @@ export default async function MessagesPage() {
                       {c.last_body ? `${c.last_from_me ? "You: " : ""}${c.last_body}` : "No messages yet"}
                     </span>
                     {c.unread > 0 && (
-                      <span className="shrink-0 rounded-full bg-accent-500 px-2 text-xs font-semibold leading-5 text-white">
+                      <span className="shrink-0 rounded-full bg-red-700 px-2 text-xs font-semibold leading-5 text-white">
                         {c.unread}
+                        <span className="sr-only"> unread</span>
                       </span>
                     )}
                   </span>

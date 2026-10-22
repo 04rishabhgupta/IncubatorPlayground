@@ -6,6 +6,9 @@ import { getSession } from "@/lib/auth/session";
 import { countUnreadMessages } from "@/lib/messages/queries";
 import { countUnreadNotifications } from "@/lib/notifications/queries";
 
+/** The number shown on a badge; the link's spoken name uses the same text (WCAG 2.5.3). */
+const badge = (count: number) => (count > 9 ? "9+" : String(count));
+
 const dashboardLabel = { visitor: "My account", company: "Dashboard", super_admin: "Admin" } as const;
 
 /** Session-aware header actions. Reads cookies, so it renders inside <Suspense>. */
@@ -45,7 +48,7 @@ export async function UserMenu() {
         <Link
           href="/messages"
           className="relative rounded-lg p-2 text-muted hover:bg-surface-muted hover:text-ink"
-          aria-label={unreadMessages ? `Messages, ${unreadMessages} unread` : "Messages"}
+          aria-label={unreadMessages ? `Messages, ${badge(unreadMessages)} unread` : "Messages"}
         >
           <svg
             viewBox="0 0 24 24"
@@ -62,8 +65,8 @@ export async function UserMenu() {
             />
           </svg>
           {unreadMessages > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-semibold leading-4 text-white">
-              {unreadMessages > 9 ? "9+" : unreadMessages}
+            <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-red-700 px-1 text-[10px] font-semibold leading-4 text-white">
+              {badge(unreadMessages)}
             </span>
           )}
         </Link>
@@ -71,7 +74,7 @@ export async function UserMenu() {
       <Link
         href="/notifications"
         className="relative rounded-lg p-2 text-muted hover:bg-surface-muted hover:text-ink"
-        aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-label={unread ? `Notifications, ${badge(unread)} unread` : "Notifications"}
       >
         <svg
           viewBox="0 0 24 24"
@@ -85,8 +88,8 @@ export async function UserMenu() {
           <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-semibold leading-4 text-white">
-            {unread > 9 ? "9+" : unread}
+          <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-red-700 px-1 text-[10px] font-semibold leading-4 text-white">
+            {badge(unread)}
           </span>
         )}
       </Link>

@@ -100,11 +100,12 @@ describe("signup and profiles", () => {
 
   it("lets a super admin change another user's role", async () => {
     const tmp = await createAuthUser(db, "tmp@example.com");
-    await as(db, user(adminId), `update public.profiles set role = 'company' where id = $1`, [tmp]);
+    await as(db, user(adminId), `update public.profiles set role = 'super_admin' where id = $1`, [tmp]);
     const { rows } = await db.query<{ role: string }>(`select role from public.profiles where id = $1`, [
       tmp,
     ]);
-    expect(rows[0].role).toBe("company");
+    // Visitor ↔ super admin is the change admins make; see user-management.test.ts for the limits.
+    expect(rows[0].role).toBe("super_admin");
   });
 });
 

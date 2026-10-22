@@ -4,7 +4,7 @@ An interactive 2D virtual startup floor. Visitors explore a top-down map of the 
 discover the companies in each office, and connect with them through live chat, email and
 appointment requests.
 
-> **Status:** Phases 1–6 (foundation, authentication and roles, company directory and admin approval, interactive floor map, availability, appointments) and Phase 4R (architectural floor plan, floor explorer, floors and building overview, startup profiles, FITT Incubation Team, announcements, office requests, layout editor and occupancy) are complete. Next: Phase 7, communication. See [docs/CHECKLIST.md](docs/CHECKLIST.md) for
+> **Status:** Phases 1–6 (foundation, authentication and roles, company directory and admin approval, interactive floor map, availability, appointments) and Phase 4R (architectural floor plan, floor explorer, floors and building overview, startup profiles, FITT Incubation Team, announcements, office requests, layout editor and occupancy) are complete. Phase 7 (live chat, message notifications, email contact form) and Phase 8 (admin user management, real-database security tests, accessibility pass) are complete. Next: production deployment, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). See [docs/CHECKLIST.md](docs/CHECKLIST.md) for
 > progress and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, data model and
 > permission model.
 
@@ -95,6 +95,8 @@ editor:
 ```sql
 update public.profiles set role = 'super_admin' where email = 'you@example.com';
 ```
+
+After that, more admins can be made (and removed) from `/admin/users`.
 
 ## Scripts
 

@@ -83,6 +83,9 @@ export default async function AdminPage() {
             <ButtonLink href="/admin/fitt-team" variant="secondary">
               FITT team
             </ButtonLink>
+            <ButtonLink href="/admin/users" variant="secondary">
+              Users
+            </ButtonLink>
             <ButtonLink href="/admin/companies">Manage companies</ButtonLink>
           </div>
         }
@@ -90,12 +93,10 @@ export default async function AdminPage() {
       <div className="space-y-6">
         <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {stats.map(([label, value]) => (
-            <Card key={label}>
-              <CardBody>
-                <dt className="text-sm text-muted">{label}</dt>
-                <dd className="mt-1 text-2xl font-semibold text-ink">{value ?? "—"}</dd>
-              </CardBody>
-            </Card>
+            <div key={label} className="rounded-xl border border-border bg-surface px-5 py-4">
+              <dt className="text-sm text-muted">{label}</dt>
+              <dd className="mt-1 text-2xl font-semibold text-ink">{value ?? "—"}</dd>
+            </div>
           ))}
         </dl>
 

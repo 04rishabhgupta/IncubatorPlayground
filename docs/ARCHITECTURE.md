@@ -160,6 +160,11 @@ Key decisions:
 | Office requests          | –                       | –                       | own: send, change, withdraw                  | read, close         |
 | Storage (logos, avatars) | public URLs             | public URLs             | write `<company_id>/…` folder                | full                |
 
+Role changes in the app (`/admin/users`, super admins only) are limited by the profile guard trigger to
+visitor ↔ super admin: an account that owns a company stays a company account, nobody becomes one
+without registering a company, admins can't change their own role, and the last super admin can't be
+demoted. The user is notified. The first super admin is still made by SQL (see README).
+
 \* Owners cannot change `status`, `slug`, `owner_id`, `floor_id` or `space_id`. Those are reserved
 for super admins, and a guard trigger enforces it. New companies are always created as `pending`.
 

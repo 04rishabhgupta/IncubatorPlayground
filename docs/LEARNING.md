@@ -385,6 +385,26 @@ team" on the label.
 **6. Status chips.** The room label shows availability as a tinted pill with a dot _and_ a word, so it
 never relies on colour alone.
 
+### Phase 8: users, real-database security tests and accessibility
+
+**1. Rules for changing roles live in the database.** The profile guard trigger only lets an admin make
+changes that keep accounts working (visitor ↔ super admin). A company owner's role is tied to its company,
+so changing it would break their dashboard; the trigger refuses, whatever calls the API.
+
+**2. Testing RLS for real.** PGlite tests the policies quickly, but production runs real Supabase:
+`e2e/rls.spec.ts` signs in as a guest, a visitor, a company and the admin with the publishable key, like a
+browser, and checks what each can read and write (private chats even hidden from the admin).
+
+**3. Automated accessibility.** `@axe-core/playwright` runs WCAG 2.1 A/AA rules on 27 pages, at desktop
+and phone size, and the test fails on any violation. It found real problems: a `<dl>` whose `<dt>`/`<dd>`
+were wrapped in extra divs, white-on-orange badges (2:1 contrast; WCAG needs 4.5:1), and controls whose
+spoken name didn't contain their visible text ("Notifications, 11 unread" while the badge showed "9+"; map
+rooms whose shortened label wasn't in the name). The map fix: the visible label card is now a sibling of the
+room button, not inside it, so the button has one clear name.
+
+**4. Security headers** (`next.config.ts`) stop the site being framed, MIME sniffing and access to
+camera, microphone and location, and keep referrers to the origin across sites.
+
 ### Phase 7: chat, notifications and email
 
 **1. One door in.** Users can't insert conversations or members at all; `start_conversation()` (a
@@ -741,12 +761,13 @@ Not every clash is forbidden:
 | 4R.1 Floor renderer   | Backward-compatible schema defaults, size-aware SVG drawing, layering, `React.memo`, SVG arcs and masks, screen-pixel text      | `src/lib/floor/geometry.ts`, `src/lib/floor/drawing.ts`, `src/lib/floor/labels.ts`, `src/components/floor/floor-symbols.tsx`, `src/components/floor/floor-map.tsx`, `/admin/floor/preview` |
 | 4R.3 Exploring        | Directional focus navigation, accent-insensitive multi-word search with match reasons, URL state for areas                      | `src/lib/floor/navigation.ts`, `src/lib/floor/search.ts`, `src/components/floor/explorer-panel.tsx`, `src/components/floor/floor-explorer.tsx`                                             |
 | 4R.2 Floor 1 plan     | In-place data migrations, guarded updates, migration-vs-seed order, upgrade-path DB tests, team seating                         | `src/lib/floor/layouts/floor-1.ts`, `src/lib/floor/seats.ts`, `20261017090000_floor1_architectural_plan.sql`, `tests/db/floor-layout.test.ts`                                              |
+| 8 Users & hardening   | Role rules in triggers, RLS tests through the real API, axe-core accessibility checks, security headers                         | `20261024090000_admin_user_management.sql`, `/admin/users`, `e2e/rls.spec.ts`, `e2e/accessibility.spec.ts`, `docs/DEPLOYMENT.md`                                                           |
 | 7 Communication       | Security-definer entry points, RLS-filtered Realtime, merged notifications, database rate limits, non-throwing email, `after()` | `20261023090000_communication.sql`, `src/lib/messages/*`, `src/components/messages/*`, `src/lib/email/*`, `src/lib/companies/contact-actions.ts`                                           |
 | 4R.6 Layout editor    | Single-transaction RPCs, optimistic concurrency, append-only history, shared client/server validation, a JSON error locator     | `src/lib/floor/layout-document.ts`, `src/components/admin/layout-editor.tsx`, `src/lib/admin/layout-actions.ts`, `20261022090000_floor_layout_history.sql`, `/admin/occupancy`             |
 | 4R.5 Startups & FITT  | Enums, time-limited rows via RLS, one-row-per-owner upserts, trigger-driven fulfilment, zone-aware admin times                  | `src/lib/companies/startup.ts`, `src/lib/companies/office-request*.ts`, `src/lib/admin/incubator-actions.ts`, `20261021090000_startup_profile_staff_announcements.sql`                     |
 | 4R.4 Floor & building | Multi-floor tabs, building overview panel, floor tagline/description metadata, admin floor switcher and settings modal          | `src/components/floor/building-panel.tsx`, `src/components/floor/floor-explorer.tsx`, `src/components/admin/floor-settings.tsx`, `20261019120000_floor_metadata.sql`                       |
 
-**Phase 8 preview:** admin user management, RLS tests against a real Supabase instance, an accessibility pass, and production deployment.
+**Next:** production deployment (see `docs/DEPLOYMENT.md`).
 
 ---
 

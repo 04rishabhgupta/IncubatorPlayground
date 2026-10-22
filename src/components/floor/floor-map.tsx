@@ -979,58 +979,69 @@ function SpaceOverlay({
 
   let y = top + padY * unit;
   return (
-    <g
-      data-space-code={space.code}
-      data-nav-id={interactive ? navId.space(space) : undefined}
-      data-selected={selected || undefined}
-      data-dimmed={dimmed || undefined}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : undefined}
-      aria-label={spaceAccessibleName(space, company)}
-      aria-pressed={interactive ? selected : undefined}
-      className={cn(
-        "outline-none transition-opacity duration-200 motion-reduce:transition-none",
-        interactive && "cursor-pointer",
-        dimmed && "opacity-35",
-        "[&:focus-visible>.focus-ring]:visible",
-      )}
-      onClick={interactive ? () => onSelect?.(space) : undefined}
-      onKeyDown={interactive ? handleKeyDown : undefined}
-      onPointerEnter={interactive ? () => onHover?.(space) : undefined}
-      onPointerLeave={interactive ? () => onHover?.(null) : undefined}
-      onFocus={
-        interactive
-          ? () => {
-              onHover?.(space);
-              onFocusSpace?.(space);
-            }
-          : undefined
-      }
-      onBlur={interactive ? () => onHover?.(null) : undefined}
-    >
-      {/* Transparent hit area so the whole room is clickable above furniture and walls. */}
-      <ShapeElement
-        shape={space.shape}
+    <>
+      <g
+        data-space-code={space.code}
+        data-nav-id={interactive ? navId.space(space) : undefined}
+        data-selected={selected || undefined}
+        data-dimmed={dimmed || undefined}
+        role={interactive ? "button" : undefined}
+        tabIndex={interactive ? 0 : undefined}
+        aria-label={interactive ? spaceAccessibleName(space, company) : undefined}
+        aria-pressed={interactive ? selected : undefined}
         className={cn(
-          "fill-transparent",
-          selected ? "stroke-brand-600" : hovered ? "stroke-brand-400" : "stroke-transparent",
-          "transition-colors duration-150 motion-reduce:transition-none",
+          "outline-none transition-opacity duration-200 motion-reduce:transition-none",
+          interactive && "cursor-pointer",
+          dimmed && "opacity-35",
+          "[&:focus-visible>.focus-ring]:visible",
         )}
-        strokeWidth={selected ? 2.5 : 1.5}
-        style={NON_SCALING}
-      />
-      {/* Keyboard focus ring, shown only for :focus-visible */}
-      <g className="focus-ring invisible">
+        onClick={interactive ? () => onSelect?.(space) : undefined}
+        onKeyDown={interactive ? handleKeyDown : undefined}
+        onPointerEnter={interactive ? () => onHover?.(space) : undefined}
+        onPointerLeave={interactive ? () => onHover?.(null) : undefined}
+        onFocus={
+          interactive
+            ? () => {
+                onHover?.(space);
+                onFocusSpace?.(space);
+              }
+            : undefined
+        }
+        onBlur={interactive ? () => onHover?.(null) : undefined}
+      >
+        {/* Transparent hit area so the whole room is clickable above furniture and walls. */}
         <ShapeElement
           shape={space.shape}
-          className="fill-none stroke-brand-500"
-          strokeWidth={3}
+          className={cn(
+            "fill-transparent",
+            selected ? "stroke-brand-600" : hovered ? "stroke-brand-400" : "stroke-transparent",
+            "transition-colors duration-150 motion-reduce:transition-none",
+          )}
+          strokeWidth={selected ? 2.5 : 1.5}
           style={NON_SCALING}
-          dashed
         />
+        {/* Keyboard focus ring, shown only for :focus-visible */}
+        <g className="focus-ring invisible">
+          <ShapeElement
+            shape={space.shape}
+            className="fill-none stroke-brand-500"
+            strokeWidth={3}
+            style={NON_SCALING}
+            dashed
+          />
+        </g>
       </g>
 
-      <g className="pointer-events-none" data-label-plate="">
+      {/* The label card sits beside the button, not inside it: it repeats the button's spoken name (often
+          shortened to fit), so it is decoration for assistive tech and the button keeps one clear name. */}
+      <g
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none transition-opacity duration-200 motion-reduce:transition-none",
+          dimmed && "opacity-35",
+        )}
+        data-label-plate={space.code}
+      >
         <rect
           x={left}
           y={top}
@@ -1086,6 +1097,6 @@ function SpaceOverlay({
           );
         })}
       </g>
-    </g>
+    </>
   );
 }
